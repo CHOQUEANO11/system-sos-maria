@@ -1,0 +1,33 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary: #ec4899;
+  --secondary: #a855f7;
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --text: #1f2937;
+}
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: "Inter", system-ui, Arial;
+  color: var(--text);
+   overflow-x:hidden;
+}
+
+
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+nav a:hover{
+  background:#de86bc;
+}
