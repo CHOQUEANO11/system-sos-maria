@@ -1,7 +1,11 @@
 import { Menu } from "lucide-react"
 import AvatarMenu from "./AvatarMenu"
 
-export default function Header({ toggle }) {
+type HeaderProps = {
+  toggle: () => void
+}
+
+export default function Header({ toggle }: HeaderProps) {
 
   return (
 

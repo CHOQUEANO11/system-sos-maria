@@ -11,7 +11,12 @@ const data = [
  { name: "Jan", casos: 5 },
  { name: "Fev", casos: 8 },
  { name: "Mar", casos: 3 }
+
 ]
+type CardProps = {
+ title: string
+ value: string | number
+}
 
 export default function Dashboard(){
 
@@ -75,7 +80,7 @@ export default function Dashboard(){
 
 }
 
-function Card({title,value}){
+const Card = ({ title, value }: CardProps) => {
 
   return(
 

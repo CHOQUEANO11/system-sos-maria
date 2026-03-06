@@ -1,8 +1,10 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import type { LatLngExpression } from "leaflet"
+import "leaflet/dist/leaflet.css"
 
 export default function EmergencyDetail(){
 
-  const position = [-1.4558, -48.4902] // Belém exemplo
+  const position: LatLngExpression = [-1.4558, -48.4902] // Belém exemplo
 
   return(
 

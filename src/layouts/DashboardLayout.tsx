@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import Header from "../components/Header"
 import Sidebar from "../components/Sidebar"
 
-export default function DashboardLayout({ children }) {
+type Props = {
+  children: ReactNode
+}
+
+export default function DashboardLayout({ children }: Props) {
 
   const [open,setOpen] = useState(true)
   const [mobile,setMobile] = useState(false)

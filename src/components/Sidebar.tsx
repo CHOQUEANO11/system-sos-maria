@@ -7,7 +7,14 @@ import {
   FileText
 } from "lucide-react"
 
-export default function Sidebar({ open, mobile }) {
+
+type SidebarProps = {
+  open: boolean
+  mobile: boolean
+  toggle: () => void
+}
+
+export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
 
   const handleClick = () => {
 
