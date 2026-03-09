@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Plus } from "lucide-react"
 import { useEffect, useState } from "react"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
