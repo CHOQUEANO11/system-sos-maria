@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Link } from "react-router-dom"
 import {
   LayoutDashboard,
@@ -6,6 +7,7 @@ import {
   Siren,
   FileText
 } from "lucide-react"
+import { useAuth } from "../context/AuthContext"
 
 
 type SidebarProps = {
@@ -14,7 +16,15 @@ type SidebarProps = {
   toggle: () => void
 }
 
+export const Roles = {
+  SUPER_ADMIN : "SUPER_ADMIN",
+  ADMIN : "ADMIN",
+  WOMAN : "WOMAN"
+}
+export type Roles = (typeof Roles)[keyof typeof Roles]
+
 export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
+  const user = useAuth()
 
   const handleClick = () => {
 
@@ -56,20 +66,28 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Dashboard
   </Link>
 
-  <Link to="/women" onClick={handleClick} style={menuItem}>
-    <Users size={18}/>
-    Mulheres
-  </Link>
-
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
 
+  <Link to="/women" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Mulheres
+  </Link>
+
+
   <Link to="/emergencies" onClick={handleClick} style={menuItem}>
     <Siren size={18}/>
     Pedidos de Ajuda
   </Link>
+
+  {user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/municipalities" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Municípios
+  </Link>
+)}
 
   <Link to="/reports" onClick={handleClick} style={menuItem}>
     <FileText size={18}/>
@@ -109,20 +127,28 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Dashboard
   </Link>
 
-  <Link to="/women" onClick={handleClick} style={menuItem}>
-    <Users size={18}/>
-    Mulheres
-  </Link>
-
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
 
+  <Link to="/women" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Mulheres
+  </Link>
+
+
   <Link to="/emergencies" onClick={handleClick} style={menuItem}>
     <Siren size={18}/>
     Pedidos de Ajuda
   </Link>
+
+  {user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/municipalities" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Municípios
+  </Link>
+)}
 
   <Link to="/reports" onClick={handleClick} style={menuItem}>
     <FileText size={18}/>

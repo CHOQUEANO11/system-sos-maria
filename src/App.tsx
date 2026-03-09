@@ -8,8 +8,10 @@ import Women from "./pages/Women"
 import Emergencies from "./pages/Emergencies"
 import EmergencyDetail from "./pages/EmergencyDetail"
 import Reports from "./pages/Reports"
+import Municipalities from "./pages/Municipality"
 
 import DashboardLayout from "./layouts/DashboardLayout"
+import PrivateRoute from "./components/PrivateRoute"
 
 function App() {
 
@@ -28,9 +30,11 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            <DashboardLayout>
-              <Dashboard />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <Dashboard />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 
@@ -39,9 +43,11 @@ function App() {
         <Route
           path="/admins"
           element={
-            <DashboardLayout>
-              <Admins />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <Admins />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 
@@ -50,9 +56,11 @@ function App() {
         <Route
           path="/women"
           element={
-            <DashboardLayout>
-              <Women />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <Women />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 
@@ -61,9 +69,11 @@ function App() {
         <Route
           path="/emergencies"
           element={
-            <DashboardLayout>
-              <Emergencies />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <Emergencies />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 
@@ -72,9 +82,22 @@ function App() {
         <Route
           path="/emergency/:id"
           element={
-            <DashboardLayout>
-              <EmergencyDetail />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <EmergencyDetail />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/municipalities"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Municipalities />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 
@@ -83,9 +106,11 @@ function App() {
         <Route
           path="/reports"
           element={
-            <DashboardLayout>
-              <Reports />
-            </DashboardLayout>
+            <PrivateRoute>
+              <DashboardLayout>
+                <Reports />
+              </DashboardLayout>
+            </PrivateRoute>
           }
         />
 

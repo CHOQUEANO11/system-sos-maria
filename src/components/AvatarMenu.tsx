@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react"
 import { User, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 
 export default function AvatarMenu() {
 
@@ -10,10 +11,8 @@ export default function AvatarMenu() {
 
   const navigate = useNavigate()
 
-  const user = {
-    name:"Admin Belém",
-    role:"ADMIN"
-  }
+  const user = useAuth()
+  console.log("USER",user)
 
   const logout = () => {
 
@@ -71,8 +70,8 @@ export default function AvatarMenu() {
             marginBottom:10
           }}>
 
-            <strong>{user.name}</strong>
-            <p style={{fontSize:12,color:"#666"}}>{user.role}</p>
+            <strong>{user.user?.name}</strong>
+            <p style={{fontSize:12,color:"#666"}}>{user.user?.role}</p>
 
           </div>
 

@@ -1,17 +1,56 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
+import { api } from "../services/api"
+import bgLogin from "../assets/fundo.png"
 
 export default function Login() {
 
   const navigate = useNavigate()
+  const { login } = useAuth()
 
-  const [cpf,setCpf] = useState("")
-  const [password,setPassword] = useState("")
+  const [cpf, setCpf] = useState("")
+  const [password, setPassword] = useState("")
 
-  const handleLogin = () => {
+  const formatCPF = (value: string) => {
 
-    if(cpf && password){
-      navigate("/dashboard")
+  const cpf = value
+    .replace(/\D/g, "")   // remove não números
+    .slice(0, 11)         // limita a 11 dígitos
+
+  return cpf
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2")
+
+}
+
+const cleanCPF = (value: string) => {
+  return value.replace(/\D/g, "")
+}
+
+  const handleLogin = async () => {
+
+    if (!cpf || !password) return
+
+    const dados = {
+      cpf: cleanCPF(cpf),
+      password
+    }
+
+    try {
+
+      // 🔹 aqui depois você conecta com sua API
+      const response = await api.post("/auth/login", dados)
+console.log('RESP',response.data)
+
+login(response.data.token, response.data.user)
+
+navigate("/dashboard")
+
+    } catch (error) {
+      console.log(error)
+      alert("Erro ao realizar login")
     }
 
   }
@@ -35,11 +74,11 @@ export default function Login() {
         </p>
 
         <input
-          placeholder="CPF"
-          value={cpf}
-          onChange={(e)=>setCpf(e.target.value)}
-          style={input}
-        />
+  placeholder="CPF"
+  value={cpf}
+  onChange={(e)=>setCpf(formatCPF(e.target.value))}
+  style={input}
+/>
 
         <input
           type="password"
@@ -64,7 +103,7 @@ export default function Login() {
 
 }
 
-const container: React.CSSProperties= {
+const container: React.CSSProperties = {
 
   width:"100%",
   height:"100vh",
@@ -73,9 +112,7 @@ const container: React.CSSProperties= {
   justifyContent:"center",
   alignItems:"center",
 
-  backgroundImage:
-  "url('https://images.unsplash.com/photo-1508780709619-79562169bc64')",
-
+  backgroundImage: `url(${bgLogin})`,
   backgroundSize:"cover",
   backgroundPosition:"center",
 
