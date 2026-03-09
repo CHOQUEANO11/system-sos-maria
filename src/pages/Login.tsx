@@ -11,6 +11,7 @@ export default function Login() {
 
   const [cpf, setCpf] = useState("")
   const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const formatCPF = (value: string) => {
 
@@ -30,6 +31,7 @@ const cleanCPF = (value: string) => {
 }
 
   const handleLogin = async () => {
+    setLoading(true)
 
     if (!cpf || !password) return
 
@@ -51,7 +53,9 @@ navigate("/dashboard")
     } catch (error) {
       console.log(error)
       alert("Erro ao realizar login")
-    }
+    } finally {
+    setLoading(false)
+  }
 
   }
 
@@ -89,11 +93,12 @@ navigate("/dashboard")
         />
 
         <button
-          onClick={handleLogin}
-          style={button}
-        >
-          Entrar
-        </button>
+  onClick={handleLogin}
+  style={button}
+  disabled={loading}
+>
+  {loading ? "Entrando..." : "Entrar"}
+</button>
 
       </div>
 
