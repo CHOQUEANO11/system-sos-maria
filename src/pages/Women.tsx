@@ -115,7 +115,7 @@ const confirmDelete = async () => {
       </div>
 
       <div style={styles.card}>
-
+<div style={{width:"100%", overflowX:"auto"}}>
         <table style={styles.table}>
 
           <thead style={styles.thead}>
@@ -212,6 +212,7 @@ const confirmDelete = async () => {
           </tbody>
 
         </table>
+        </div>
 
         <div style={styles.pagination}>
 
@@ -305,7 +306,6 @@ const styles = {
     fontSize:14,
     borderBottom:"1px solid #f1f5f9"
   },
-
   row:{
     transition:"background 0.2s"
   },
