@@ -1,9 +1,23 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import type { LatLngExpression } from "leaflet"
 import { api } from "../services/api"
-import "leaflet/dist/leaflet.css"
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 type Emergency = {
   id: string
@@ -110,23 +124,19 @@ export default function EmergencyDetail(){
         <div style={styles.map}>
 
           <MapContainer
-            center={position}
-            zoom={16}
-            style={{height:"100%", width:"100%"}}
-          >
+  center={position}
+  zoom={16}
+  style={{ height: "100%", width: "100%" }}
+>
+  <TileLayer
+    attribution="© OpenStreetMap"
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  />
 
-            <TileLayer
-              attribution="© OpenStreetMap"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-
-            <Marker position={position}>
-              <Popup>
-                Pedido de ajuda
-              </Popup>
-            </Marker>
-
-          </MapContainer>
+  <Marker position={position}>
+    <Popup>Pedido de ajuda</Popup>
+  </Marker>
+</MapContainer>
 
         </div>
 
