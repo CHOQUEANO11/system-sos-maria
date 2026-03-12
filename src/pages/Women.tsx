@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react"
 import { api } from "../services/api"
@@ -5,6 +6,7 @@ import { useAuth } from "../context/AuthContext"
 import CreateWomanModal from "../components/modals/CreateWomanModal"
 import EditWomanModal from "../components/modals/EditWomanModal"
 import ConfirmDeleteModal from "../components/modals/ConfirmDeleteModal"
+import ViewWomanModal from "../components/modals/ViewWomanModal"
 
 type Woman = {
   id: string
@@ -28,6 +30,7 @@ export default function Women() {
 const [deleteOpen,setDeleteOpen] = useState(false)
 
 const [selectedWoman,setSelectedWoman] = useState<any>(null)
+const [viewOpen,setViewOpen] = useState(false)
 
 
   const [page, setPage] = useState(1)
@@ -67,6 +70,13 @@ const [selectedWoman,setSelectedWoman] = useState<any>(null)
   useEffect(()=>{
     loadWomen()
   },[page])
+
+  const handleView = (woman:any)=>{
+
+ setSelectedWoman(woman)
+ setViewOpen(true)
+
+}
 
   const handleEdit = (woman:any) => {
 
@@ -124,6 +134,7 @@ const confirmDelete = async () => {
               <th style={styles.th}>CPF</th>
               <th style={styles.th}>Município</th>
               <th style={styles.th}>Status</th>
+              {/* <th align="center" style={styles.th}>Ação</th> */}
             </tr>
           </thead>
 
@@ -184,6 +195,13 @@ const confirmDelete = async () => {
                   <td style={styles.td}>
 
  <div style={styles.actions}>
+
+  <button
+ style={styles.viewBtn}
+ onClick={()=>handleView(woman)}
+>
+ 👁
+</button>
 
   <button
    style={styles.editBtn}
@@ -254,6 +272,12 @@ const confirmDelete = async () => {
  onClose={()=>setDeleteOpen(false)}
  onConfirm={confirmDelete}
  name={selectedWoman?.name}
+/>
+
+<ViewWomanModal
+ isOpen={viewOpen}
+ onClose={()=>setViewOpen(false)}
+ woman={selectedWoman}
 />
 </>
 
@@ -388,6 +412,18 @@ deleteBtn:{
   cursor:"pointer",
   fontSize:12,
   fontWeight:500
+},
+viewBtn:{
+ display:"flex",
+ alignItems:"center",
+ justifyContent:"center",
+ padding:"6px 10px",
+ borderRadius:6,
+ border:"none",
+ background:"#8de8ca",
+ color:"#fff",
+ cursor:"pointer",
+ fontSize:14
 }
 
 }

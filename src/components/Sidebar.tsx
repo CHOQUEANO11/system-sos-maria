@@ -76,6 +76,11 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Mulheres
   </Link>
 
+  <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Solicitação de Visita
+  </Link>
+
 
   <Link to="/emergencies" onClick={handleClick} style={menuItem}>
     <Siren size={18}/>
@@ -135,6 +140,11 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
+  </Link>
+
+  <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Solicitação de Visita
   </Link>
 
 

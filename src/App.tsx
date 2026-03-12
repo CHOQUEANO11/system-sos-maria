@@ -9,6 +9,7 @@ import Emergencies from "./pages/Emergencies"
 import EmergencyDetail from "./pages/EmergencyDetail"
 import Reports from "./pages/Reports"
 import Municipalities from "./pages/Municipality"
+import VisitRequests from "./pages/VisitRequests"
 
 import DashboardLayout from "./layouts/DashboardLayout"
 import PrivateRoute from "./components/PrivateRoute"
@@ -113,6 +114,17 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        <Route
+ path="/visitRequest"
+ element={
+  <PrivateRoute>
+   <DashboardLayout>
+    <VisitRequests />
+   </DashboardLayout>
+  </PrivateRoute>
+ }
+/>
 
       </Routes>
 
