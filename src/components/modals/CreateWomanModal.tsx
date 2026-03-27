@@ -11,27 +11,36 @@ export default function CreateWomanModal({isOpen,onClose,onCreated}:any){
 
  const [form,setForm] = useState<any>({
   name:"",
+  rg: "",
   cpf:"",
   email:"",
   phone:"",
   address:"",
+  processNumber: ""
  })
 
  const handleCreate = async () => {
 
   if (!user) return
 
-  await api.post("/users",{
-   ...form,
-   password: 'maria@2026',
-   role:"WOMAN",
-   municipalityId:user.municipalityId
-  })
+  try{
 
-  onCreated()
-  onClose()
+    await api.post("/users",{
+      ...form,
+      password: 'maria@2026',
+      role:"WOMAN",
+      municipalityId: user.municipalityId,
+      unidadeId: user.unidadeId
+    })
 
- }
+    onCreated()
+    onClose()
+
+  }catch{
+    alert("Erro ao cadastrar")
+  }
+
+}
 
  return(
 
@@ -54,6 +63,12 @@ export default function CreateWomanModal({isOpen,onClose,onCreated}:any){
    />
 
    <input
+    placeholder="Rg"
+    style={styles.input}
+    onChange={(e)=>setForm({...form,rg:e.target.value})}
+   />
+
+   <input
     placeholder="Telefone"
     style={styles.input}
     onChange={(e)=>setForm({...form,phone:e.target.value})}
@@ -69,6 +84,12 @@ export default function CreateWomanModal({isOpen,onClose,onCreated}:any){
     placeholder="Endereço"
     style={styles.input}
     onChange={(e)=>setForm({...form,address:e.target.value})}
+   />
+
+   <input
+    placeholder="Número Processo"
+    style={styles.input}
+    onChange={(e)=>setForm({...form,processNumber:e.target.value})}
    />
 
 

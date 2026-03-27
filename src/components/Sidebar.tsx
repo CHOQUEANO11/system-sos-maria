@@ -137,6 +137,16 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Admins
   </Link>
 
+  <Link to="/efetivo" onClick={handleClick} style={menuItem}>
+  <Shield size={18}/>
+  Efetivo
+</Link>
+
+<Link to="/agenda-create" onClick={handleClick} style={menuItem}>
+  <Users size={18}/>
+  Criar Agenda
+</Link>
+
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
@@ -157,6 +167,13 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
   <Link to="/municipalities" onClick={handleClick} style={menuItem}>
     <Siren size={18}/>
     Municípios
+  </Link>
+)}
+
+{user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/units" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Unidades
   </Link>
 )}
 

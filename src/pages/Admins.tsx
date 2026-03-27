@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import { useEffect, useState } from "react"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import CreateAdminModal from "../components/modals/CreateAdminModal"
 
 type Admin = {
   id: string
@@ -27,6 +28,8 @@ export default function Admins(){
 
   const [editOpen,setEditOpen] = useState(false)
   const [selectedAdmin,setSelectedAdmin] = useState<Admin | null>(null)
+  const [open,setOpen] = useState(false)
+
 
   const [form,setForm] = useState<any>({
     name:"",
@@ -114,7 +117,7 @@ export default function Admins(){
   }
 
   return(
-
+<>
     <div>
 
       <div style={styles.header}>
@@ -123,7 +126,7 @@ export default function Admins(){
           Administradores
         </h2>
 
-        <button style={styles.primaryBtn}>
+        <button style={styles.primaryBtn} onClick={()=>setOpen(true)}>
           <Plus size={18}/>
           Novo Admin
         </button>
@@ -286,6 +289,12 @@ export default function Admins(){
       )}
 
     </div>
+    <CreateAdminModal
+  isOpen={open}
+  onClose={()=>setOpen(false)}
+  onCreated={loadAdmins} // ✔ correto
+/>
+       </>
 
   )
 

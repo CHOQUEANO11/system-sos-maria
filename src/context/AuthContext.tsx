@@ -10,6 +10,7 @@ interface User {
   email: string
   role: string
   municipalityId?: string
+  unidadeId?: string
 }
 
 type AuthContextType = {

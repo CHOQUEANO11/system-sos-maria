@@ -11,8 +11,13 @@ import Reports from "./pages/Reports"
 import Municipalities from "./pages/Municipality"
 import VisitRequests from "./pages/VisitRequests"
 
+// 🔥 NOVAS PAGES
+import Efetivo from "./pages/Efetivo"
+import CreateAgenda from "./pages/CreateAgenda"
+
 import DashboardLayout from "./layouts/DashboardLayout"
 import PrivateRoute from "./components/PrivateRoute"
+import Unidades from "./pages/Unit"
 
 function App() {
 
@@ -22,11 +27,15 @@ function App() {
 
       <Routes>
 
-        {/* LOGIN */}
+        {/* =========================
+            LOGIN
+        ========================= */}
 
         <Route path="/" element={<Login />} />
 
-        {/* DASHBOARD */}
+        {/* =========================
+            DASHBOARD
+        ========================= */}
 
         <Route
           path="/dashboard"
@@ -39,7 +48,9 @@ function App() {
           }
         />
 
-        {/* ADMINS */}
+        {/* =========================
+            ADMINS
+        ========================= */}
 
         <Route
           path="/admins"
@@ -52,7 +63,9 @@ function App() {
           }
         />
 
-        {/* WOMEN */}
+        {/* =========================
+            MULHERES
+        ========================= */}
 
         <Route
           path="/women"
@@ -65,7 +78,39 @@ function App() {
           }
         />
 
-        {/* EMERGENCIES */}
+        {/* =========================
+            EFETIVO (NOVO)
+        ========================= */}
+
+        <Route
+          path="/efetivo"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Efetivo />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* =========================
+            AGENDA (NOVO)
+        ========================= */}
+
+        <Route
+          path="/agenda-create"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <CreateAgenda />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* =========================
+            EMERGÊNCIAS
+        ========================= */}
 
         <Route
           path="/emergencies"
@@ -78,8 +123,6 @@ function App() {
           }
         />
 
-        {/* EMERGENCY DETAIL */}
-
         <Route
           path="/emergency/:id"
           element={
@@ -91,18 +134,24 @@ function App() {
           }
         />
 
+        {/* =========================
+            VISITAS
+        ========================= */}
+
         <Route
-          path="/municipalities"
+          path="/visitRequest"
           element={
             <PrivateRoute>
               <DashboardLayout>
-                <Municipalities />
+                <VisitRequests />
               </DashboardLayout>
             </PrivateRoute>
           }
         />
 
-        {/* REPORTS */}
+        {/* =========================
+            RELATÓRIOS
+        ========================= */}
 
         <Route
           path="/reports"
@@ -115,16 +164,31 @@ function App() {
           }
         />
 
+        {/* =========================
+            MUNICÍPIOS
+        ========================= */}
+
         <Route
- path="/visitRequest"
- element={
-  <PrivateRoute>
-   <DashboardLayout>
-    <VisitRequests />
-   </DashboardLayout>
-  </PrivateRoute>
- }
-/>
+          path="/municipalities"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Municipalities />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/units"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Unidades />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
 
       </Routes>
 
