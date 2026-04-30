@@ -526,7 +526,7 @@ export default function AgendaPage() {
                             onClick={() => toggleMilitar(m)}
                           >
                             <div>
-                              <span>{m.graduacao?.name || "Graduação não informada"}</span> -
+                              <span>{m.graduacao?.name || "Graduação não informada"}</span> - 
                               <strong>{m.user?.nomeDeGuerra}</strong> 
                             </div>
 
