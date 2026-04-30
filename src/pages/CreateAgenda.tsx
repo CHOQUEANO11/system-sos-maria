@@ -500,7 +500,7 @@ export default function AgendaPage() {
                           style={styles.selectedPoliceChip}
                           onClick={() => removeMilitar(m.id)}
                         >
-                          {m.graduacao?.name} - {m.user?.name} ×
+                          {m.graduacao?.name} - {m.user?.nomeDeGuerra} ×
                         </button>
                       ))}
                     </div>
@@ -526,8 +526,8 @@ export default function AgendaPage() {
                             onClick={() => toggleMilitar(m)}
                           >
                             <div>
-                              <strong>{m.user?.name}</strong>
-                              <span>{m.graduacao?.name || "Graduação não informada"}</span>
+                              <span>{m.graduacao?.name || "Graduação não informada"}</span> -
+                              <strong>{m.user?.nomeDeGuerra}</strong> 
                             </div>
 
                             <small>
@@ -1091,7 +1091,7 @@ const modalStyles: any = {
     marginTop: 6,
     flexWrap: "wrap"
   },
-  
+
   btnDisabled: {
   background: "#d1d5db",
   color: "#6b7280",
