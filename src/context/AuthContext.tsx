@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useState } from "react"
 
 interface User {
+  address: string
+  phone: string
+  nomeDeGuerra: string
   id: string
   rg: string
   name: string

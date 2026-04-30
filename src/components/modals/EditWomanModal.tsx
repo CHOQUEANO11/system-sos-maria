@@ -1,120 +1,142 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+ 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
 
-export default function EditWomanModal({isOpen,onClose,onUpdated,woman}:any){
+export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: any) {
+  const [saving, setSaving] = useState(false)
 
- const [form,setForm] = useState<any>({
-  name:"",
-  cpf:"",
-  email:"",
-  phone:"",
-  address:""
- })
+  const [form, setForm] = useState<any>({
+    name: "",
+    cpf: "",
+    rg: "",
+    email: "",
+    phone: "",
+    address: "",
+    processNumber: ""
+  })
 
- useEffect(()=>{
+  useEffect(() => {
+    if (woman) {
+      setForm({
+        name: woman.name || "",
+        cpf: woman.cpf || "",
+        rg: woman.rg || "",
+        email: woman.email || "",
+        phone: woman.phone || "",
+        address: woman.address || "",
+        processNumber: woman.processNumber || ""
+      })
+    }
+  }, [woman])
 
-  if(woman){
+  async function handleUpdate() {
+    if (!woman || saving) return
 
-   setForm({
-    name:woman.name || "",
-    cpf:woman.cpf || "",
-    email:woman.email || "",
-    phone:woman.phone || "",
-    address:woman.address || ""
-   })
+    if (!form.name || !form.cpf) {
+      alert("Preencha nome e CPF.")
+      return
+    }
 
+    try {
+      setSaving(true)
+
+      await api.put(`/users/${woman.id}`, form)
+
+      await onUpdated()
+      onClose()
+    } catch (error) {
+      console.log("Erro ao atualizar mulher", error)
+      alert("Erro ao atualizar cadastro.")
+    } finally {
+      setSaving(false)
+    }
   }
 
- },[woman])
+  if (!woman) return null
 
- const handleUpdate = async () => {
+  return (
+    <ModalBase isOpen={isOpen} onClose={onClose} title="Editar Mulher">
+      <div style={styles.form}>
+        <Input label="Nome" value={form.name} onChange={(value: string) => setForm({ ...form, name: value })} />
+        <Input label="CPF" value={form.cpf} onChange={(value: string) => setForm({ ...form, cpf: value })} />
+        <Input label="RG" value={form.rg} onChange={(value: string) => setForm({ ...form, rg: value })} />
+        <Input label="Telefone" value={form.phone} onChange={(value: string) => setForm({ ...form, phone: value })} />
+        <Input label="Email" value={form.email} onChange={(value: string) => setForm({ ...form, email: value })} />
+        <Input label="Endereço" value={form.address} onChange={(value: string) => setForm({ ...form, address: value })} />
+        <Input label="Número do Processo" value={form.processNumber} onChange={(value: string) => setForm({ ...form, processNumber: value })} />
 
-  await api.put(`/users/${woman.id}`,form)
-
-  onUpdated()
-  onClose()
-
- }
-
- if(!woman) return null
-
- return(
-
-  <ModalBase
-   isOpen={isOpen}
-   onClose={onClose}
-   title="Editar Mulher"
-  >
-
-   <input
-    value={form.name}
-    placeholder="Nome"
-    style={styles.input}
-    onChange={(e)=>setForm({...form,name:e.target.value})}
-   />
-
-   <input
-    value={form.cpf}
-    placeholder="CPF"
-    style={styles.input}
-    onChange={(e)=>setForm({...form,cpf:e.target.value})}
-   />
-
-   <input
-    value={form.phone}
-    placeholder="Telefone"
-    style={styles.input}
-    onChange={(e)=>setForm({...form,phone:e.target.value})}
-   />
-
-   <input
-    value={form.email}
-    placeholder="Email"
-    style={styles.input}
-    onChange={(e)=>setForm({...form,email:e.target.value})}
-   />
-
-   <input
-    value={form.address}
-    placeholder="Endereço"
-    style={styles.input}
-    onChange={(e)=>setForm({...form,address:e.target.value})}
-   />
-
-   <button
-    onClick={handleUpdate}
-    style={styles.btn}
-   >
-    Atualizar
-   </button>
-
-  </ModalBase>
-
- )
-
+        <button
+          onClick={handleUpdate}
+          style={saving ? styles.btnDisabled : styles.btn}
+          disabled={saving}
+        >
+          {saving ? "Atualizando..." : "Atualizar Cadastro"}
+        </button>
+      </div>
+    </ModalBase>
+  )
 }
 
-const styles:any = {
+function Input({ label, value, onChange }: any) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+      <input
+        placeholder={label}
+        style={styles.input}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
 
- input:{
-  width:"100%",
-  padding:10,
-  borderRadius:6,
-  border:"1px solid #ddd",
-  marginBottom:12
- },
+const styles: any = {
+  form: {
+    display: "grid",
+    gap: 12
+  },
 
- btn:{
-  width:"100%",
-  padding:10,
-  background:"#6366f1",
-  color:"#fff",
-  border:"none",
-  borderRadius:6
- }
+  label: {
+    display: "block",
+    marginBottom: 6,
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: 800
+  },
 
+  input: {
+    width: "100%",
+    padding: "11px 12px",
+    borderRadius: 9,
+    border: "1px solid #d1d5db",
+    background: "#f9fafb",
+    outline: "none",
+    fontSize: 14
+  },
+
+  btn: {
+    width: "100%",
+    padding: "12px",
+    background: "#6366f1",
+    color: "#fff",
+    border: "none",
+    borderRadius: 9,
+    cursor: "pointer",
+    fontWeight: 800
+  },
+
+  btnDisabled: {
+    width: "100%",
+    padding: "12px",
+    background: "#d1d5db",
+    color: "#6b7280",
+    border: "none",
+    borderRadius: 9,
+    cursor: "not-allowed",
+    fontWeight: 800
+  }
 }

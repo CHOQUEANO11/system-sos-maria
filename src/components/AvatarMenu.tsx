@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef, useEffect } from "react"
 import { User, LogOut } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 export default function AvatarMenu() {
@@ -75,20 +75,24 @@ export default function AvatarMenu() {
 
           </div>
 
-          <button
-            style={{
-              display:"flex",
-              gap:10,
-              width:"100%",
-              border:"none",
-              background:"transparent",
-              padding:10,
-              cursor:"pointer"
-            }}
-          >
-            <User size={16}/>
-            Perfil
-          </button>
+          <Link
+  to="/profile"
+  style={{
+    display: "flex",
+    gap: 10,
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    padding: 10,
+    cursor: "pointer",
+    textDecoration: "none",
+    color: "#374151"
+  }}
+>
+  <User size={16} />
+  Perfil
+</Link>
+
 
           <button
             onClick={logout}

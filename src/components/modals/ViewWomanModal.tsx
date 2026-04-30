@@ -2,333 +2,384 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react"
+import { FileText, HeartPulse, X, UserRound } from "lucide-react"
 import { api } from "../../services/api"
 
 export default function ViewWomanModal({ isOpen, onClose, woman }: any) {
+  const [reports, setReports] = useState<any[]>([])
+  const [emotions, setEmotions] = useState<any[]>([])
+  const [tab, setTab] = useState("reports")
+  const [loading, setLoading] = useState(false)
 
- const [reports,setReports] = useState([])
- const [emotions,setEmotions] = useState([])
- const [tab,setTab] = useState("reports")
+  useEffect(() => {
+    if (woman && isOpen) {
+      loadData()
+    }
+  }, [woman, isOpen])
 
- useEffect(()=>{
+  async function loadData() {
+    try {
+      setLoading(true)
 
-  if(woman){
-   loadData()
+      const [reportsRes, emotionsRes] = await Promise.all([
+        api.get(`/reports/${woman.id}`),
+        api.get(`/daily-emotions/${woman.id}`)
+      ])
+
+      setReports(reportsRes.data || [])
+      setEmotions(emotionsRes.data || [])
+    } catch (error) {
+      console.log("Erro ao carregar dados da mulher", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
- },[woman])
+  function calculateEmotionScore() {
+    const weights: any = {
+      BEM: 0,
+      TRISTE: 1,
+      PREOCUPADA: 2,
+      CHORANDO: 3,
+      MEDO: 4,
+      ANSIEDADE: 3,
+      SOLIDAO: 3,
+      PERIGO: 5
+    }
 
- const loadData = async () => {
+    const total = emotions.reduce((sum: number, e: any) => {
+      return sum + (weights[e.emotion] || 0)
+    }, 0)
 
-  const reportsRes = await api.get(`/reports/${woman.id}`)
-  const emotionsRes = await api.get(`/daily-emotions/${woman.id}`)
-
-  setReports(reportsRes.data)
-  setEmotions(emotionsRes.data)
-
- }
-
- const calculateEmotionScore = ()=>{
-
-  const weights:any = {
-   BEM:0,
-   TRISTE:1,
-   PREOCUPADA:2,
-   CHORANDO:3,
-   MEDO:4,
-   ANSIEDADE:3,
-   SOLIDAO:3,
-   PERIGO:5
+    const max = emotions.length * 5
+    return max ? Math.round((total / max) * 100) : 0
   }
 
-  let total = 0
+  function getRiskColor(risk: number) {
+    if (risk < 30) return "#10b981"
+    if (risk < 70) return "#f59e0b"
+    return "#ef4444"
+  }
 
-  emotions.forEach((e:any)=>{
-   total += weights[e.emotion] || 0
-  })
+  const risk = calculateEmotionScore()
 
-  const max = emotions.length * 5
+  if (!isOpen || !woman) return null
 
-  const percentage = max ? Math.round((total/max)*100) : 0
+  return (
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <div style={styles.header}>
+          <div style={styles.headerInfo}>
+            <div style={styles.avatar}>
+              <UserRound size={24} />
+            </div>
 
-  return percentage
+            <div>
+              <h2 style={styles.name}>{woman.name}</h2>
+              <span style={styles.subtitle}>
+                {woman.municipality?.name || "Município não informado"}
+              </span>
+            </div>
+          </div>
 
- }
-
- const risk = calculateEmotionScore()
-
- if(!isOpen) return null
-
- return(
-
-  <div style={styles.overlay}>
-
-   <div style={styles.modal}>
-
-    {/* HEADER */}
-
-    <div style={styles.header}>
-
-     <div>
-      <h2 style={styles.name}>{woman.name}</h2>
-      <span style={styles.subtitle}>
-       {woman.municipality?.name}
-      </span>
-     </div>
-
-     <button style={styles.close} onClick={onClose}>
-      ✕
-     </button>
-
-    </div>
-
-    {/* DADOS */}
-
-    <div style={styles.infoGrid}>
-     <div style={styles.infoCard}>
-      <span className="label">CPF: </span>
-      <b>{woman.cpf}</b>
-     </div>
-
-     <div style={styles.infoCard}>
-      <span className="label">Município: </span>
-      <b>{woman.municipality?.name}</b>
-     </div>
-
-     <div style={styles.infoCard}>
-      <span className="label">Risco emocional</span>
-
-      <div style={styles.riskBar}>
-       <div
-        style={{
-         ...styles.riskFill,
-         width:`${risk}%`
-        }}
-       />
-      </div>
-
-      <small>{risk}%</small>
-
-     </div>
-
-    </div>
-
-    {/* TABS */}
-
-    <div style={styles.tabs}>
-
-     <button
-      style={tab === "reports" ? styles.tabActive : styles.tab}
-      onClick={()=>setTab("reports")}
-     >
-      Fatos
-     </button>
-
-     <button
-      style={tab === "emotions" ? styles.tabActive : styles.tab}
-      onClick={()=>setTab("emotions")}
-     >
-      Emoções
-     </button>
-
-    </div>
-
-    {/* CONTEÚDO */}
-
-    <div style={styles.content}>
-
-     {tab === "reports" && (
-
-      <div>
-
-       {reports.length === 0 && (
-        <p style={styles.empty}>
-         Nenhum fato registrado
-        </p>
-       )}
-
-       {reports.map((r:any)=>(
-        <div key={r.id} style={styles.reportCard}>
-
-         <div style={styles.reportDate}>
-          {new Date(r.createdAt).toLocaleDateString("pt-BR")}
-         </div>
-
-         <p>{r.description}</p>
-
+          <button style={styles.close} onClick={onClose}>
+            <X size={20} />
+          </button>
         </div>
-       ))}
 
-      </div>
+        <div style={styles.infoGrid}>
+          <InfoCard label="CPF" value={woman.cpf || "-"} />
+          <InfoCard label="Município" value={woman.municipality?.name || "-"} />
 
-     )}
+          <div style={styles.infoCard}>
+            <span style={styles.infoLabel}>Risco emocional</span>
 
-     {tab === "emotions" && (
+            <div style={styles.riskRow}>
+              <div style={styles.riskBar}>
+                <div
+                  style={{
+                    ...styles.riskFill,
+                    width: `${risk}%`,
+                    background: getRiskColor(risk)
+                  }}
+                />
+              </div>
 
-      <div>
-
-       {emotions.length === 0 && (
-        <p style={styles.empty}>
-         Nenhuma emoção registrada
-        </p>
-       )}
-
-       {emotions.map((e:any)=>(
-        <div key={e.id} style={styles.emotionCard}>
-
-         <span>{e.emotion}</span>
-
-         <span style={styles.date}>
-          {new Date(e.createdAt).toLocaleDateString("pt-BR")}
-         </span>
-
+              <strong style={{ color: getRiskColor(risk) }}>
+                {risk}%
+              </strong>
+            </div>
+          </div>
         </div>
-       ))}
 
+        <div style={styles.tabs}>
+          <button
+            style={tab === "reports" ? styles.tabActive : styles.tab}
+            onClick={() => setTab("reports")}
+          >
+            <FileText size={16} />
+            Fatos
+          </button>
+
+          <button
+            style={tab === "emotions" ? styles.tabActive : styles.tab}
+            onClick={() => setTab("emotions")}
+          >
+            <HeartPulse size={16} />
+            Emoções
+          </button>
+        </div>
+
+        <div style={styles.content}>
+          {loading && <p style={styles.empty}>Carregando informações...</p>}
+
+          {!loading && tab === "reports" && (
+            <>
+              {reports.length === 0 && (
+                <p style={styles.empty}>Nenhum fato registrado</p>
+              )}
+
+              {reports.map((r: any) => (
+                <div key={r.id} style={styles.reportCard}>
+                  <div style={styles.reportDate}>
+                    {new Date(r.createdAt).toLocaleDateString("pt-BR")}
+                  </div>
+
+                  <p style={styles.reportText}>{r.description}</p>
+                </div>
+              ))}
+            </>
+          )}
+
+          {!loading && tab === "emotions" && (
+            <>
+              {emotions.length === 0 && (
+                <p style={styles.empty}>Nenhuma emoção registrada</p>
+              )}
+
+              {emotions.map((e: any) => (
+                <div key={e.id} style={styles.emotionCard}>
+                  <strong>{e.emotion}</strong>
+
+                  <span style={styles.date}>
+                    {new Date(e.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
       </div>
-
-     )}
-
     </div>
-
-   </div>
-
-  </div>
-
- )
-
+  )
 }
 
-const styles:any = {
+function InfoCard({ label, value }: any) {
+  return (
+    <div style={styles.infoCard}>
+      <span style={styles.infoLabel}>{label}</span>
+      <strong style={styles.infoValue}>{value}</strong>
+    </div>
+  )
+}
 
- overlay:{
-  position:"fixed",
-  top:0,
-  left:0,
-  width:"100%",
-  height:"100%",
-  background:"rgba(0,0,0,0.45)",
-  display:"flex",
-  alignItems:"center",
-  justifyContent:"center",
-  zIndex:1000
- },
+const styles: any = {
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: 16
+  },
 
- modal:{
-  width:"85%",
-  maxWidth:900,
-  maxHeight:"90vh",
-  background:"#fff",
-  borderRadius:12,
-  padding:30,
-  overflowY:"auto",
-  boxShadow:"0 10px 35px rgba(0,0,0,0.15)"
- },
+  modal: {
+    width: "100%",
+    maxWidth: 920,
+    maxHeight: "90vh",
+    background: "#fff",
+    borderRadius: 16,
+    padding: 26,
+    overflowY: "auto",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.2)"
+  },
 
- header:{
-  display:"flex",
-  justifyContent:"space-between",
-  alignItems:"center",
-  marginBottom:25
- },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 24
+  },
 
- name:{
-  margin:0,
-  fontSize:22
- },
+  headerInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12
+  },
 
- subtitle:{
-  color:"#6b7280"
- },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    background: "#fdf2f8",
+    color: "#db2777",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
 
- close:{
-  background:"transparent",
-  border:"none",
-  fontSize:20,
-  cursor:"pointer"
- },
+  name: {
+    margin: 0,
+    color: "#111827",
+    fontSize: 24,
+    fontWeight: 900
+  },
 
- infoGrid:{
-  display:"grid",
-  gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",
-  gap:15,
-  marginBottom:25
- },
+  subtitle: {
+    display: "block",
+    color: "#6b7280",
+    marginTop: 4
+  },
 
- infoCard:{
-  background:"#f9fafb",
-  padding:15,
-  borderRadius:8
- },
+  close: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    border: "none",
+    background: "#f3f4f6",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
 
- riskBar:{
-  height:6,
-  background:"#e5e7eb",
-  borderRadius:5,
-  marginTop:8
- },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+    gap: 14,
+    marginBottom: 22
+  },
 
- riskFill:{
-  height:6,
-  background:"#ef4444",
-  borderRadius:5
- },
+  infoCard: {
+    background: "#f9fafb",
+    border: "1px solid #eef2f7",
+    padding: 15,
+    borderRadius: 12
+  },
 
- tabs:{
-  display:"flex",
-  gap:10,
-  marginBottom:20
- },
+  infoLabel: {
+    display: "block",
+    color: "#6b7280",
+    fontSize: 13,
+    marginBottom: 6,
+    fontWeight: 700
+  },
 
- tab:{
-  padding:"8px 16px",
-  border:"1px solid #e5e7eb",
-  borderRadius:6,
-  background:"#fff",
-  cursor:"pointer"
- },
+  infoValue: {
+    color: "#111827",
+    fontSize: 15
+  },
 
- tabActive:{
-  padding:"8px 16px",
-  borderRadius:6,
-  background:"#ec4899",
-  color:"#fff",
-  border:"none"
- },
+  riskRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10
+  },
 
- content:{
-  minHeight:200
- },
+  riskBar: {
+    flex: 1,
+    height: 8,
+    background: "#e5e7eb",
+    borderRadius: 999,
+    overflow: "hidden"
+  },
 
- reportCard:{
-  background:"#f9fafb",
-  padding:15,
-  borderRadius:8,
-  marginBottom:12
- },
+  riskFill: {
+    height: "100%",
+    borderRadius: 999
+  },
 
- reportDate:{
-  fontSize:12,
-  color:"#6b7280",
-  marginBottom:5
- },
+  tabs: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 18,
+    flexWrap: "wrap"
+  },
 
- emotionCard:{
-  display:"flex",
-  justifyContent:"space-between",
-  background:"#f9fafb",
-  padding:12,
-  borderRadius:8,
-  marginBottom:10
- },
+  tab: {
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "9px 14px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 9,
+    background: "#fff",
+    color: "#374151",
+    cursor: "pointer",
+    fontWeight: 800
+  },
 
- date:{
-  color:"#6b7280",
-  fontSize:12
- },
+  tabActive: {
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "9px 14px",
+    borderRadius: 9,
+    background: "#ec4899",
+    color: "#fff",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 800
+  },
 
- empty:{
-  color:"#9ca3af"
- }
+  content: {
+    minHeight: 220
+  },
 
+  reportCard: {
+    background: "#f9fafb",
+    border: "1px solid #eef2f7",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 12
+  },
+
+  reportDate: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 6,
+    fontWeight: 800
+  },
+
+  reportText: {
+    margin: 0,
+    color: "#374151",
+    lineHeight: 1.5
+  },
+
+  emotionCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    background: "#f9fafb",
+    border: "1px solid #eef2f7",
+    padding: 13,
+    borderRadius: 12,
+    marginBottom: 10
+  },
+
+  date: {
+    color: "#6b7280",
+    fontSize: 12
+  },
+
+  empty: {
+    color: "#9ca3af",
+    fontWeight: 700,
+    textAlign: "center",
+    padding: 24
+  }
 }

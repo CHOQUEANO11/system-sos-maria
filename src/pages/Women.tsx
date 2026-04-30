@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useState } from "react"
+import { Plus, Eye, Pencil, Trash2, Users } from "lucide-react"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import CreateWomanModal from "../components/modals/CreateWomanModal"
@@ -20,26 +22,24 @@ type Woman = {
 }
 
 export default function Women() {
-
   const { user } = useAuth()
 
   const [women, setWomen] = useState<Woman[]>([])
   const [loading, setLoading] = useState(false)
-  const [open,setOpen] = useState(false)
-  const [editOpen,setEditOpen] = useState(false)
-const [deleteOpen,setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
-const [selectedWoman,setSelectedWoman] = useState<any>(null)
-const [viewOpen,setViewOpen] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [viewOpen, setViewOpen] = useState(false)
 
+  const [selectedWoman, setSelectedWoman] = useState<any>(null)
 
   const [page, setPage] = useState(1)
   const limit = 10
 
   const loadWomen = async () => {
-
     try {
-
       setLoading(true)
 
       const params: any = {
@@ -48,382 +48,458 @@ const [viewOpen,setViewOpen] = useState(false)
         limit
       }
 
-      // se não for CIEPAS filtra por município
       if (user?.role !== "SUPER_ADMIN") {
-  params.municipalityId = user?.municipalityId
-}
+        params.municipalityId = user?.municipalityId
+      }
 
-      const response = await api.get("/users",{ params })
-
-      setWomen(response.data.data)
-
+      const response = await api.get("/users", { params })
+      setWomen(response.data.data || [])
     } catch (error) {
-
       console.log("Erro ao carregar mulheres", error)
-
     } finally {
       setLoading(false)
     }
-
   }
 
-  useEffect(()=>{
+  useEffect(() => {
     loadWomen()
-  },[page])
+  }, [page])
 
-  const handleView = (woman:any)=>{
+  function handleView(woman: any) {
+    setSelectedWoman(woman)
+    setViewOpen(true)
+  }
 
- setSelectedWoman(woman)
- setViewOpen(true)
+  function handleEdit(woman: any) {
+    setSelectedWoman(woman)
+    setEditOpen(true)
+  }
 
-}
+  function handleDelete(woman: any) {
+    setSelectedWoman(woman)
+    setDeleteOpen(true)
+  }
 
-  const handleEdit = (woman:any) => {
+  async function confirmDelete() {
+    if (!selectedWoman || deleting) return
 
- setSelectedWoman(woman)
- setEditOpen(true)
+    try {
+      setDeleting(true)
 
-}
+      await api.delete(`/users/${selectedWoman.id}`)
 
-const handleDelete = (woman:any) => {
+      setDeleteOpen(false)
+      setSelectedWoman(null)
 
- setSelectedWoman(woman)
- setDeleteOpen(true)
+      await loadWomen()
+    } catch (error) {
+      console.log("Erro ao excluir mulher", error)
+      alert("Erro ao excluir cadastro.")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-}
-
-const confirmDelete = async () => {
-
- await api.delete(`/users/${selectedWoman.id}`)
-
- setDeleteOpen(false)
- loadWomen()
-
-}
-
-  return(
+  return (
     <>
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div>
+            <h2 style={styles.title}>Mulheres Cadastradas</h2>
+            <p style={styles.subtitle}>
+              Consulte, cadastre e acompanhe as assistidas vinculadas ao sistema.
+            </p>
+          </div>
 
-    <div>
+          <button style={styles.primaryBtn} onClick={() => setOpen(true)}>
+            <Plus size={18} />
+            Nova Mulher
+          </button>
+        </div>
 
-      <div style={styles.header}>
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div style={styles.cardTitleArea}>
+              <div style={styles.iconBox}>
+                <Users size={20} />
+              </div>
 
-        <h2 style={styles.title}>
-          Mulheres Cadastradas
-        </h2>
+              <div>
+                <h3 style={styles.cardTitle}>Assistidas cadastradas</h3>
+                <p style={styles.cardSubtitle}>
+                  Página {page} • {women.length} registro(s)
+                </p>
+              </div>
+            </div>
+          </div>
 
-        <button style={styles.primaryBtn} onClick={()=>setOpen(true)}>
- Nova Mulher
-</button>
-
-<CreateWomanModal
- isOpen={open}
- onClose={()=>setOpen(false)}
- onCreated={loadWomen}
-/>
-
-      </div>
-
-      <div style={styles.card}>
-<div style={{width:"100%", overflowX:"auto"}}>
-        <table style={styles.table}>
-
-          <thead style={styles.thead}>
-            <tr>
-              <th style={styles.th}>Nome</th>
-              <th style={styles.th}>CPF</th>
-              <th style={styles.th}>Município</th>
-              <th style={styles.th}>Status</th>
-              {/* <th align="center" style={styles.th}>Ação</th> */}
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {loading && (
-              <tr>
-                <td colSpan={4} style={styles.empty}>
-                  Carregando...
-                </td>
-              </tr>
-            )}
-
-            {!loading && women.length === 0 && (
-              <tr>
-                <td colSpan={4} style={styles.empty}>
-                  Nenhuma mulher cadastrada
-                </td>
-              </tr>
-            )}
-
-            {women.map((woman,index)=>{
-
-              const isInactive = woman.status === "Inativa"
-
-              return(
-
-                <tr
-                  key={woman.id}
-                  style={{
-                    ...styles.row,
-                    background:index % 2 === 0 ? "#fafafa" : "#fff"
-                  }}
-                >
-
-                  <td style={styles.td}>{woman.name}</td>
-
-                  <td style={styles.td}>{woman.cpf}</td>
-
-                  <td style={styles.td}>
-                    {woman.municipality?.name || "-"}
-                  </td>
-
-                  <td style={styles.td}>
-
-                    <span
-                      style={{
-                        ...styles.statusBadge,
-                        background:isInactive ? "#fee2e2" : "#dcfce7",
-                        color:isInactive ? "#b91c1c" : "#166534"
-                      }}
-                    >
-                      {woman.status || "Ativa"}
-                    </span>
-
-                  </td>
-
-                  <td style={styles.td}>
-
- <div style={styles.actions}>
-
-  <button
- style={styles.viewBtn}
- onClick={()=>handleView(woman)}
->
- 👁
-</button>
-
-  <button
-   style={styles.editBtn}
-   onClick={()=>handleEdit(woman)}
-  >
-   Editar
-  </button>
-
-  <button
-   style={styles.deleteBtn}
-   onClick={()=>handleDelete(woman)}
-  >
-   Excluir
-  </button>
-
- </div>
-
-</td>
-
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Nome</th>
+                  <th style={styles.th}>CPF</th>
+                  <th style={styles.th}>Município</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Ações</th>
                 </tr>
+              </thead>
 
-              )
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={5} style={styles.empty}>
+                      Carregando mulheres...
+                    </td>
+                  </tr>
+                )}
 
-            })}
+                {!loading && women.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={styles.empty}>
+                      Nenhuma mulher cadastrada
+                    </td>
+                  </tr>
+                )}
 
-          </tbody>
+                {!loading &&
+                  women.map((woman, index) => {
+                    const isInactive = woman.status === "Inativa"
 
-        </table>
+                    return (
+                      <tr
+                        key={woman.id}
+                        style={{
+                          ...styles.row,
+                          background: index % 2 === 0 ? "#fff" : "#fafafa"
+                        }}
+                      >
+                        <td style={styles.td}>
+                          <strong style={styles.name}>{woman.name}</strong>
+                        </td>
+
+                        <td style={styles.td}>{woman.cpf || "-"}</td>
+
+                        <td style={styles.td}>
+                          {woman.municipality?.name || "-"}
+                        </td>
+
+                        <td style={styles.td}>
+                          <span
+                            style={{
+                              ...styles.statusBadge,
+                              background: isInactive ? "#fee2e2" : "#dcfce7",
+                              color: isInactive ? "#b91c1c" : "#166534"
+                            }}
+                          >
+                            {woman.status || "Ativa"}
+                          </span>
+                        </td>
+
+                        <td style={styles.td}>
+                          <div style={styles.actions}>
+                            <button
+                              style={styles.viewBtn}
+                              onClick={() => handleView(woman)}
+                            >
+                              <Eye size={15} />
+                              Ver
+                            </button>
+
+                            <button
+                              style={styles.editBtn}
+                              onClick={() => handleEdit(woman)}
+                            >
+                              <Pencil size={15} />
+                              Editar
+                            </button>
+
+                            <button
+                              style={styles.deleteBtn}
+                              onClick={() => handleDelete(woman)}
+                            >
+                              <Trash2 size={15} />
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={styles.pagination}>
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+              style={page === 1 ? styles.pageBtnDisabled : styles.pageBtn}
+            >
+              Anterior
+            </button>
+
+            <span style={styles.pageText}>Página {page}</span>
+
+            <button
+              disabled={women.length < limit}
+              onClick={() => setPage(page + 1)}
+              style={women.length < limit ? styles.pageBtnDisabled : styles.pageBtn}
+            >
+              Próxima
+            </button>
+          </div>
         </div>
-
-        <div style={styles.pagination}>
-
-          <button
-            disabled={page === 1}
-            onClick={()=>setPage(page - 1)}
-            style={styles.pageBtn}
-          >
-            Anterior
-          </button>
-
-          <span style={styles.pageText}>
-            Página {page}
-          </span>
-
-          <button
-            disabled={women.length < limit}
-            onClick={()=>setPage(page + 1)}
-            style={styles.pageBtn}
-          >
-            Próxima
-          </button>
-
-        </div>
-
       </div>
 
-    </div>
+      <CreateWomanModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        onCreated={loadWomen}
+      />
 
-    <EditWomanModal
- isOpen={editOpen}
- onClose={()=>setEditOpen(false)}
- onUpdated={loadWomen}
- woman={selectedWoman}
-/>
+      <EditWomanModal
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        onUpdated={loadWomen}
+        woman={selectedWoman}
+      />
 
-<ConfirmDeleteModal
- isOpen={deleteOpen}
- onClose={()=>setDeleteOpen(false)}
- onConfirm={confirmDelete}
- name={selectedWoman?.name}
-/>
+      <ConfirmDeleteModal
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={confirmDelete}
+        name={selectedWoman?.name}
+        loading={deleting}
+      />
 
-<ViewWomanModal
- isOpen={viewOpen}
- onClose={()=>setViewOpen(false)}
- woman={selectedWoman}
-/>
-</>
-
+      <ViewWomanModal
+        isOpen={viewOpen}
+        onClose={() => setViewOpen(false)}
+        woman={selectedWoman}
+      />
+    </>
   )
-
 }
 
-
-const styles = {
-
-  header:{
-    display:"flex",
-    justifyContent:"space-between",
-    alignItems:"center",
-    marginBottom:20
+const styles: any = {
+  container: {
+    width: "100%"
   },
 
-  title:{
-    margin:0,
-    fontSize:22
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 24,
+    flexWrap: "wrap"
   },
 
-  card:{
-    background:"#fff",
-    padding:25,
-    borderRadius:14,
-    boxShadow:"0 6px 18px rgba(0,0,0,0.06)"
+  title: {
+    margin: 0,
+    color: "#111827",
+    fontSize: 26,
+    fontWeight: 800
   },
 
-  table:{
-    width:"100%",
-    borderCollapse:"collapse" as const
+  subtitle: {
+    margin: "6px 0 0",
+    color: "#6b7280",
+    fontSize: 14
   },
 
-  thead:{
-    background:"#f9fafb"
+  primaryBtn: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    padding: "11px 16px",
+    background: "#ec4899",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontWeight: 800
   },
 
-  th:{
-    textAlign:"left" as const,
-    padding:"14px 16px",
-    fontSize:13,
-    color:"#6b7280",
-    borderBottom:"1px solid #e5e7eb",
-    fontWeight:600
+  card: {
+    background: "#fff",
+    padding: 22,
+    borderRadius: 14,
+    border: "1px solid #eef2f7",
+    boxShadow: "0 10px 28px rgba(15,23,42,0.06)"
   },
 
-  td:{
-    padding:"14px 16px",
-    fontSize:14,
-    borderBottom:"1px solid #f1f5f9"
-  },
-  row:{
-    transition:"background 0.2s"
+  cardHeader: {
+    marginBottom: 16
   },
 
-  empty:{
-    padding:25,
-    textAlign:"center" as const,
-    color:"#9ca3af"
+  cardTitleArea: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12
   },
 
-  primaryBtn:{
-    display:"flex",
-    gap:8,
-    alignItems:"center",
-    padding:"10px 16px",
-    background:"#ec4899",
-    color:"#fff",
-    border:"none",
-    borderRadius:8,
-    cursor:"pointer",
-    fontWeight:500
+  iconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    background: "#fdf2f8",
+    color: "#db2777",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
   },
 
-  statusBadge:{
-    padding:"5px 10px",
-    borderRadius:6,
-    fontSize:12,
-    fontWeight:600
+  cardTitle: {
+    margin: 0,
+    color: "#111827",
+    fontSize: 18
   },
 
-  pagination:{
-    marginTop:25,
-    display:"flex",
-    justifyContent:"center",
-    alignItems:"center",
-    gap:15
+  cardSubtitle: {
+    margin: "4px 0 0",
+    color: "#6b7280",
+    fontSize: 13
   },
 
-  pageBtn:{
-    padding:"8px 14px",
-    borderRadius:6,
-    border:"1px solid #e5e7eb",
-    background:"#fff",
-    cursor:"pointer"
+  tableWrapper: {
+    width: "100%",
+    overflowX: "auto",
+    border: "1px solid #eef2f7",
+    borderRadius: 12
   },
 
-  pageText:{
-    fontWeight:500
+  table: {
+    width: "100%",
+    minWidth: 850,
+    borderCollapse: "collapse"
   },
-  actions:{
-  display:"flex",
-  justifyContent:"center",
-  alignItems:"center",
-  gap:10
-},
 
-editBtn:{
-  display:"flex",
-  alignItems:"center",
-  gap:6,
-  padding:"6px 12px",
-  borderRadius:6,
-  border:"none",
-  background:"#6366f1",
-  color:"#fff",
-  cursor:"pointer",
-  fontSize:12,
-  fontWeight:500
-},
+  th: {
+    background: "#f8fafc",
+    color: "#374151",
+    padding: "14px 16px",
+    textAlign: "left",
+    fontSize: 13,
+    fontWeight: 800,
+    borderBottom: "1px solid #e5e7eb"
+  },
 
-deleteBtn:{
-  display:"flex",
-  alignItems:"center",
-  gap:6,
-  padding:"6px 12px",
-  borderRadius:6,
-  border:"none",
-  background:"#ef4444",
-  color:"#fff",
-  cursor:"pointer",
-  fontSize:12,
-  fontWeight:500
-},
-viewBtn:{
- display:"flex",
- alignItems:"center",
- justifyContent:"center",
- padding:"6px 10px",
- borderRadius:6,
- border:"none",
- background:"#8de8ca",
- color:"#fff",
- cursor:"pointer",
- fontSize:14
-}
+  td: {
+    padding: "14px 16px",
+    color: "#374151",
+    fontSize: 14,
+    borderBottom: "1px solid #f1f5f9"
+  },
 
+  row: {
+    transition: "background 0.2s"
+  },
+
+  name: {
+    color: "#111827"
+  },
+
+  empty: {
+    padding: 28,
+    textAlign: "center",
+    color: "#9ca3af",
+    fontWeight: 700
+  },
+
+  statusBadge: {
+    display: "inline-block",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  actions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap"
+  },
+
+  viewBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#10b981",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  editBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#6366f1",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  deleteBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#ef4444",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  pagination: {
+    marginTop: 20,
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
+  pageBtn: {
+    padding: "9px 14px",
+    borderRadius: 9,
+    border: "none",
+    background: "#ec4899",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 800
+  },
+
+  pageBtnDisabled: {
+    padding: "9px 14px",
+    borderRadius: 9,
+    border: "none",
+    background: "#e5e7eb",
+    color: "#9ca3af",
+    cursor: "not-allowed",
+    fontWeight: 800
+  },
+
+  pageText: {
+    padding: "9px 12px",
+    borderRadius: 9,
+    background: "#f9fafb",
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: 800
+  }
 }

@@ -20,6 +20,8 @@ import CreateAgenda from "./pages/CreateAgenda"
 import DashboardLayout from "./layouts/DashboardLayout"
 import PrivateRoute from "./components/PrivateRoute"
 import Unidades from "./pages/Unit"
+import Profile from "./pages/Profile"
+
 
 function App() {
 
@@ -200,6 +202,17 @@ function App() {
             <PrivateRoute>
               <DashboardLayout>
                 <Unidades />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Profile />
               </DashboardLayout>
             </PrivateRoute>
           }
