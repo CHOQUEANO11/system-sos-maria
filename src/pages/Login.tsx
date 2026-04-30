@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { api } from "../services/api"
 import bgLogin from "../assets/fundo.png"
+import IMGLOGO from "../../public/sos2.png"
+import { toast } from "react-toastify"
 
 export default function Login() {
 
@@ -12,6 +14,7 @@ export default function Login() {
   const [cpf, setCpf] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  
 
   const formatCPF = (value: string) => {
 
@@ -33,7 +36,7 @@ const cleanCPF = (value: string) => {
   const handleLogin = async () => {
     setLoading(true)
 
-    if (!cpf || !password) return
+    if (!cpf || !password) return toast.error("Preencha todos os campos")
 
     const dados = {
       cpf: cleanCPF(cpf),
@@ -47,12 +50,14 @@ const cleanCPF = (value: string) => {
 console.log('RESP',response.data)
 
 login(response.data.token, response.data.user)
+toast.success(`Login realizado com sucesso, seja bem-vindo(a) ${response.data.user.name}!`)
 
 navigate("/dashboard")
 
     } catch (error) {
       console.log(error)
       alert("Erro ao realizar login")
+      toast.error("Erro ao realizar login")
     } finally {
     setLoading(false)
   }
@@ -71,7 +76,8 @@ navigate("/dashboard")
 
       <div style={card}>
 
-        <h2 style={title}>Gestão SOS</h2>
+        <img src={IMGLOGO} alt="Logo SOS Maria" style={{ width: "100%", marginBottom: -10 }} />
+        {/* <h2 style={title}>Gestão SOS</h2> */}
 
         <p style={subtitle}>
           Sistema de monitoramento e proteção
@@ -155,13 +161,13 @@ const card: React.CSSProperties = {
 
 }
 
-const title: React.CSSProperties = {
+// const title: React.CSSProperties = {
 
-  textAlign:"center",
-  fontSize:26,
-  color:"#ec4899"
+//   textAlign:"center",
+//   fontSize:26,
+//   color:"#ec4899"
 
-}
+// }
 
 const subtitle: React.CSSProperties = {
 

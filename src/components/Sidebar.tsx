@@ -8,6 +8,7 @@ import {
   FileText
 } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
+import IMG2 from "../../public/sos2.png"
 
 
 type SidebarProps = {
@@ -19,12 +20,14 @@ type SidebarProps = {
 export const Roles = {
   SUPER_ADMIN : "SUPER_ADMIN",
   ADMIN : "ADMIN",
-  WOMAN : "WOMAN"
+  WOMAN : "WOMAN",
+  POLICE : "POLICE"
 }
 export type Roles = (typeof Roles)[keyof typeof Roles]
 
 export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
   const user = useAuth()
+  console.log("Sidebar renderizado, user:", user)
 
   const handleClick = () => {
 
@@ -60,26 +63,51 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
             gap:20
           }}
         >
+          <Link to="/dashboard" onClick={handleClick} style={menuItem}>
+          <img src={IMG2} alt="Logo SOS Maria" style={{ width: "100%", marginBottom: 20 }} />
+          </Link>
 
           <Link to="/dashboard" onClick={handleClick} style={menuItem}>
     <LayoutDashboard size={18}/>
     Dashboard
   </Link>
-
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
+  )}
+  {user?.user?.role === Roles.ADMIN && (
+  <Link to="/efetivo" onClick={handleClick} style={menuItem}>
+  <Shield size={18}/>
+  Efetivo
+</Link>
+)}
+{user?.user?.role === Roles.ADMIN && (
+  <Link to="/agenda-create" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Criar Agenda
+  </Link>
+)}
 
+{/* {user?.user?.role === Roles.ADMIN && ( */}
+  <Link to="/agenda-police" onClick={handleClick} style={menuItem}>
+    <Shield size={18}/>
+    Minhas Visitas
+  </Link>
+{/* )} */}
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
   </Link>
-
+)}
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Solicitação de Visita
   </Link>
+  )}
 
 
   <Link to="/emergencies" onClick={handleClick} style={menuItem}>
@@ -94,10 +122,24 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
   </Link>
 )}
 
+{user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/units" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Unidades
+  </Link>
+)}
+{/* {user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/graduations" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Graduações
+  </Link>
+)} */}
+{user?.user?.role === Roles.SUPER_ADMIN && (
   <Link to="/reports" onClick={handleClick} style={menuItem}>
     <FileText size={18}/>
     Relatórios
   </Link>
+)}
 
         </nav>
 
@@ -131,31 +173,43 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     <LayoutDashboard size={18}/>
     Dashboard
   </Link>
-
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
-
+  )}
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/efetivo" onClick={handleClick} style={menuItem}>
   <Shield size={18}/>
   Efetivo
 </Link>
+)}
+{user?.user?.role === Roles.ADMIN && (
+  <Link to="/agenda-create" onClick={handleClick} style={menuItem}>
+    <Users size={18}/>
+    Criar Agenda
+  </Link>
+)}
 
-<Link to="/agenda-create" onClick={handleClick} style={menuItem}>
-  <Users size={18}/>
-  Criar Agenda
-</Link>
-
+{/* {user?.user?.role === Roles.ADMIN && ( */}
+  <Link to="/agenda-police" onClick={handleClick} style={menuItem}>
+    <Shield size={18}/>
+    Minhas Visitas
+  </Link>
+{/* )} */}
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
   </Link>
-
+)}
+  {user?.user?.role === Roles.ADMIN && (
   <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Solicitação de Visita
   </Link>
+  )}
 
 
   <Link to="/emergencies" onClick={handleClick} style={menuItem}>
@@ -176,12 +230,18 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Unidades
   </Link>
 )}
-
+{/* {user?.user?.role === Roles.SUPER_ADMIN && (
+  <Link to="/graduations" onClick={handleClick} style={menuItem}>
+    <Siren size={18}/>
+    Graduações
+  </Link>
+)} */}
+{user?.user?.role === Roles.SUPER_ADMIN && (
   <Link to="/reports" onClick={handleClick} style={menuItem}>
     <FileText size={18}/>
     Relatórios
   </Link>
-
+)}
       </nav>
 
     </aside>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Login from "./pages/Login"
 import Dashboard from "./pages/Dashboard"
 
+
 import Admins from "./pages/Admins"
 import Women from "./pages/Women"
 import Emergencies from "./pages/Emergencies"
@@ -10,6 +11,7 @@ import EmergencyDetail from "./pages/EmergencyDetail"
 import Reports from "./pages/Reports"
 import Municipalities from "./pages/Municipality"
 import VisitRequests from "./pages/VisitRequests"
+import AgendaPolicePage from "./pages/AgendaPolicePage"
 
 // 🔥 NOVAS PAGES
 import Efetivo from "./pages/Efetivo"
@@ -22,10 +24,12 @@ import Unidades from "./pages/Unit"
 function App() {
 
   return (
+    
 
     <BrowserRouter>
 
       <Routes>
+
 
         {/* =========================
             LOGIN
@@ -103,6 +107,17 @@ function App() {
             <PrivateRoute>
               <DashboardLayout>
                 <CreateAgenda />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/agenda-police"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <AgendaPolicePage />
               </DashboardLayout>
             </PrivateRoute>
           }
