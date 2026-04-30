@@ -71,19 +71,19 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     <LayoutDashboard size={18}/>
     Dashboard
   </Link>
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  &&  (
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
   )}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/efetivo" onClick={handleClick} style={menuItem}>
   <Shield size={18}/>
   Efetivo
 </Link>
 )}
-{user?.user?.role === Roles.ADMIN && (
+{user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN     && (
   <Link to="/agenda-create" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Criar Agenda
@@ -96,13 +96,13 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Minhas Visitas
   </Link>
 {/* )} */}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
   </Link>
 )}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Solicitação de Visita
@@ -173,19 +173,19 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     <LayoutDashboard size={18}/>
     Dashboard
   </Link>
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/admins" onClick={handleClick} style={menuItem}>
     <Shield size={18}/>
     Admins
   </Link>
   )}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/efetivo" onClick={handleClick} style={menuItem}>
   <Shield size={18}/>
   Efetivo
 </Link>
 )}
-{user?.user?.role === Roles.ADMIN && (
+{user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN   && (
   <Link to="/agenda-create" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Criar Agenda
@@ -198,13 +198,13 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
     Minhas Visitas
   </Link>
 {/* )} */}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/women" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Mulheres
   </Link>
 )}
-  {user?.user?.role === Roles.ADMIN && (
+  {user?.user?.role === Roles.ADMIN || user?.user?.role === Roles.SUPER_ADMIN  && (
   <Link to="/visitRequest" onClick={handleClick} style={menuItem}>
     <Users size={18}/>
     Solicitação de Visita
