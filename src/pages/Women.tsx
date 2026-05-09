@@ -19,6 +19,8 @@ type Woman = {
     name: string
   }
   status?: string
+  programStartDate?: string
+  programEndDate?: string
 }
 
 export default function Women() {
@@ -100,6 +102,29 @@ export default function Women() {
     }
   }
 
+  function toDateBR(value?: string) {
+  if (!value) return ""
+
+  const dateOnly = value.slice(0, 10)
+  const [year, month, day] = dateOnly.split("-")
+
+  if (!year || !month || !day) return ""
+
+  return `${day}/${month}/${year}`
+}
+
+function formatCPF(value: string) {
+  const numbers = value.replace(/\D/g, "")
+
+  return numbers
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2")
+    .slice(0, 14)
+}
+
+
+
   return (
     <>
       <div style={styles.container}>
@@ -140,6 +165,8 @@ export default function Women() {
                   <th style={styles.th}>Nome</th>
                   <th style={styles.th}>CPF</th>
                   <th style={styles.th}>Município</th>
+                  <th style={styles.th}>Data de Início</th>
+                  <th style={styles.th}>Data de Término</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
                 </tr>
@@ -178,10 +205,18 @@ export default function Women() {
                           <strong style={styles.name}>{woman.name}</strong>
                         </td>
 
-                        <td style={styles.td}>{woman.cpf || "-"}</td>
+                        <td style={styles.td}>{formatCPF(woman.cpf) || "-"}</td>
 
                         <td style={styles.td}>
                           {woman.municipality?.name || "-"}
+                        </td>
+
+                        <td style={styles.td}>
+                          {toDateBR(woman.programStartDate) || "-"}
+                        </td>
+
+                        <td style={styles.td}>
+                          {toDateBR(woman.programEndDate) || "-"}
                         </td>
 
                         <td style={styles.td}>

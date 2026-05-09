@@ -7,30 +7,63 @@ import { api } from "../../services/api"
 
 export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: any) {
   const [saving, setSaving] = useState(false)
+  const [kinships, setKinships] = useState<any[]>([])
+
+useEffect(() => {
+  if (isOpen) {
+    loadKinships()
+  }
+}, [isOpen])
+
+async function loadKinships() {
+  try {
+    const { data } = await api.get("/kinships")
+    setKinships(data || [])
+  } catch (error) {
+    console.log("Erro ao carregar parentescos", error)
+  }
+}
+
 
   const [form, setForm] = useState<any>({
-    name: "",
-    cpf: "",
-    rg: "",
-    email: "",
-    phone: "",
-    address: "",
-    processNumber: ""
-  })
+  name: "",
+  cpf: "",
+  rg: "",
+  email: "",
+  phone: "",
+  address: "",
+  processNumber: "",
+  aggressorName: "",
+  kinshipId: "",
+  programStartDate: "",
+  programEndDate: ""
+})
+
 
   useEffect(() => {
     if (woman) {
       setForm({
-        name: woman.name || "",
-        cpf: woman.cpf || "",
-        rg: woman.rg || "",
-        email: woman.email || "",
-        phone: woman.phone || "",
-        address: woman.address || "",
-        processNumber: woman.processNumber || ""
-      })
+  name: woman.name || "",
+  cpf: woman.cpf || "",
+  rg: woman.rg || "",
+  email: woman.email || "",
+  phone: woman.phone || "",
+  address: woman.address || "",
+  processNumber: woman.processNumber || "",
+  aggressorName: woman.aggressorName || "",
+  kinshipId: woman.kinshipId || woman.kinship?.id || "",
+  programStartDate: toDateInput(woman.programStartDate),
+  programEndDate: toDateInput(woman.programEndDate)
+})
+
     }
   }, [woman])
+
+  function toDateInput(value?: string) {
+  if (!value) return ""
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 
   async function handleUpdate() {
     if (!woman || saving) return
@@ -43,7 +76,7 @@ export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: an
     try {
       setSaving(true)
 
-      await api.put(`/users/${woman.id}`, form)
+      await api.put(`/users/${woman.id}`, { ...form, cpf: form.cpf.replace(/\D/g, "")})
 
       await onUpdated()
       onClose()
@@ -57,28 +90,136 @@ export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: an
 
   if (!woman) return null
 
+  function formatCPF(value: string) {
+  const numbers = value.replace(/\D/g, "")
+
+  return numbers
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2")
+    .slice(0, 14)
+}
+
+
   return (
     <ModalBase isOpen={isOpen} onClose={onClose} title="Editar Mulher">
-      <div style={styles.form}>
-        <Input label="Nome" value={form.name} onChange={(value: string) => setForm({ ...form, name: value })} />
-        <Input label="CPF" value={form.cpf} onChange={(value: string) => setForm({ ...form, cpf: value })} />
-        <Input label="RG" value={form.rg} onChange={(value: string) => setForm({ ...form, rg: value })} />
-        <Input label="Telefone" value={form.phone} onChange={(value: string) => setForm({ ...form, phone: value })} />
-        <Input label="Email" value={form.email} onChange={(value: string) => setForm({ ...form, email: value })} />
-        <Input label="Endereço" value={form.address} onChange={(value: string) => setForm({ ...form, address: value })} />
-        <Input label="Número do Processo" value={form.processNumber} onChange={(value: string) => setForm({ ...form, processNumber: value })} />
+  <div style={styles.form}>
+    <Input
+      label="Nome"
+      value={form.name}
+      onChange={(value: string) => setForm({ ...form, name: value })}
+    />
 
-        <button
-          onClick={handleUpdate}
-          style={saving ? styles.btnDisabled : styles.btn}
-          disabled={saving}
-        >
-          {saving ? "Atualizando..." : "Atualizar Cadastro"}
-        </button>
-      </div>
-    </ModalBase>
+    <Input
+  label="CPF"
+  value={form.cpf}
+  onChange={(value: string) =>
+    setForm({ ...form, cpf: formatCPF(value) })
+  }
+/>
+
+
+    <Input
+      label="RG"
+      value={form.rg}
+      onChange={(value: string) => setForm({ ...form, rg: value })}
+    />
+
+    <Input
+      label="Telefone"
+      value={form.phone}
+      onChange={(value: string) => setForm({ ...form, phone: value })}
+    />
+
+    <Input
+      label="Email"
+      value={form.email}
+      onChange={(value: string) => setForm({ ...form, email: value })}
+    />
+
+    <Input
+      label="Endereço"
+      value={form.address}
+      onChange={(value: string) => setForm({ ...form, address: value })}
+    />
+
+    <Input
+      label="Número do Processo"
+      value={form.processNumber}
+      onChange={(value: string) => setForm({ ...form, processNumber: value })}
+    />
+
+    <Input
+      label="Nome do acusado"
+      value={form.aggressorName}
+      onChange={(value: string) => setForm({ ...form, aggressorName: value })}
+    />
+
+    <div>
+      <label style={styles.label}>Grau de parentesco</label>
+
+      <select
+        style={styles.input}
+        value={form.kinshipId}
+        onChange={(e) => setForm({ ...form, kinshipId: e.target.value })}
+      >
+        <option value="">Selecione...</option>
+
+        {kinships.map((item: any) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <DateInput
+  label="Data de início do programa"
+  value={form.programStartDate}
+  onChange={(value: string) =>
+    setForm({ ...form, programStartDate: value })
+  }
+/>
+
+<DateInput
+  label="Data de término do programa"
+  value={form.programEndDate}
+  onChange={(value: string) =>
+    setForm({ ...form, programEndDate: value })
+  }
+/>
+
+
+    <button
+      onClick={handleUpdate}
+      style={saving ? styles.btnDisabled : styles.btn}
+      disabled={saving}
+    >
+      {saving ? "Atualizando..." : "Atualizar Cadastro"}
+    </button>
+  </div>
+</ModalBase>
+
   )
 }
+
+function DateInput({ label, value, onChange }: any) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+
+      <input
+        type="date"
+        style={styles.input}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.preventDefault()}
+        onPaste={(e) => e.preventDefault()}
+      />
+    </div>
+  )
+}
+
 
 function Input({ label, value, onChange }: any) {
   return (
