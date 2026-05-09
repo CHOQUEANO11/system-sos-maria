@@ -88,6 +88,7 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
 
   return (
     <ModalBase isOpen={isOpen} onClose={onClose} title="Cadastrar Mulher">
+      <div style={styles.scrollArea}>
       <div style={styles.form}>
         <Input
           label="Nome"
@@ -188,6 +189,7 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
           {saving ? "Salvando..." : "Salvar Cadastro"}
         </button>
       </div>
+      </div>
     </ModalBase>
   )
 }
@@ -229,6 +231,12 @@ const styles: any = {
     display: "grid",
     gap: 12
   },
+
+  scrollArea: {
+  maxHeight: "calc(100vh - 140px)",
+  overflowY: "auto",
+  paddingRight: 6
+},
 
   label: {
     display: "block",

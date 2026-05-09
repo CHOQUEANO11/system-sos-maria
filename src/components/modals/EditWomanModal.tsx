@@ -103,6 +103,7 @@ async function loadKinships() {
 
   return (
     <ModalBase isOpen={isOpen} onClose={onClose} title="Editar Mulher">
+      <div style={styles.scrollArea}>
   <div style={styles.form}>
     <Input
       label="Nome"
@@ -198,6 +199,7 @@ async function loadKinships() {
       {saving ? "Atualizando..." : "Atualizar Cadastro"}
     </button>
   </div>
+  </div>
 </ModalBase>
 
   )
@@ -241,8 +243,14 @@ const styles: any = {
     gap: 12
   },
 
+  scrollArea: {
+  maxHeight: "calc(100vh - 140px)",
+  overflowY: "auto",
+  paddingRight: 6
+},
+
   label: {
-    display: "block",
+    display: "block",  
     marginBottom: 6,
     color: "#374151",
     fontSize: 13,
