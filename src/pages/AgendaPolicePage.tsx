@@ -470,7 +470,7 @@ export default function AgendaPolicePage() {
           ["Bairro", acompanhamento.bairro || "-"],
           ["Observações gerais", acompanhamento.observacoesGerais || "-"]
         ]
-      : [["Status", "Pendente"]]
+      : [["Status", "Finalizado"]]
   })
 
   const pdfBlob = doc.output("blob")

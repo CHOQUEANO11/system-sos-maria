@@ -28,6 +28,7 @@ import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import DashboardPolice from "./DashboardPolice"
 
+
 type CardProps = {
   title: string
   value: string | number
@@ -66,11 +67,11 @@ export default function Dashboard() {
 
       const [womenRes, adminsRes, emergenciesRes] = await Promise.all([
         api.get("/users", {
-          params: { role: "WOMAN", ...params }
+          params: { role: "WOMAN", ...params, all: true }
         }),
 
         api.get("/users", {
-          params: { role: "ADMIN", ...params }
+          params: { role: "ADMIN", ...params, all: true }
         }),
 
         api.get("/emergencies", { params })

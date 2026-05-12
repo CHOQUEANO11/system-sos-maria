@@ -165,7 +165,6 @@ export default function AgendaPage() {
   }
 }
 
-
   async function handleDelete(id: string) {
     const confirm = window.confirm("Deseja excluir a escala?")
 
