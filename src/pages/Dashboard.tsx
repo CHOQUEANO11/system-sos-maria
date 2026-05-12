@@ -21,13 +21,13 @@ import {
   Siren,
   CheckCircle2,
   Printer,
-  BarChart3
+  BarChart3,
+  MapPinned
 } from "lucide-react"
 
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import DashboardPolice from "./DashboardPolice"
-
 
 type CardProps = {
   title: string
@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [chart, setChart] = useState<any[]>([])
   const [statusChart, setStatusChart] = useState<any[]>([])
   const [adminsChart, setAdminsChart] = useState<any[]>([])
+  const [emergenciesByMunicipality, setEmergenciesByMunicipality] = useState<any[]>([])
 
   const loadDashboard = async () => {
     if (user?.role === "POLICE") return
@@ -126,6 +127,26 @@ export default function Dashboard() {
         { name: "Em progresso", value: inProgress },
         { name: "Resolvidos", value: resolvedCount }
       ])
+
+      const municipalityCases: any = {}
+
+      emergencies.forEach((e: any) => {
+        const municipalityName =
+          e.municipality?.name ||
+          e.user?.municipality?.name ||
+          "Sem município"
+
+        municipalityCases[municipalityName] = (municipalityCases[municipalityName] || 0) + 1
+      })
+
+      const municipalityCasesData = Object.keys(municipalityCases)
+        .map((name) => ({
+          name,
+          pedidos: municipalityCases[name]
+        }))
+        .sort((a, b) => b.pedidos - a.pedidos)
+
+      setEmergenciesByMunicipality(municipalityCasesData)
 
       if (user?.role === "SUPER_ADMIN") {
         const municipalities: any = {}
@@ -289,6 +310,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div style={styles.chartCard}>
+        <div style={styles.chartHeader}>
+          <div>
+            <h3 style={styles.chartTitle}>Pedidos de ajuda por município</h3>
+            <p style={styles.chartSubtitle}>
+              Ranking dos municípios com maior volume de acionamentos.
+            </p>
+          </div>
+
+          <div style={styles.mapIcon}>
+            <MapPinned size={20} />
+          </div>
+        </div>
+
+        {emergenciesByMunicipality.length === 0 ? (
+          <EmptyChart text="Nenhum pedido de ajuda por município." />
+        ) : (
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={emergenciesByMunicipality}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} />
+              <Tooltip />
+              <Bar dataKey="pedidos" fill="#dc2626" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       {user?.role === "SUPER_ADMIN" && (
         <div style={styles.chartCard}>
           <div style={styles.chartHeader}>
@@ -336,11 +386,7 @@ const Card = ({ title, value, icon: Icon, color, bg }: CardProps) => {
 }
 
 function EmptyChart({ text }: any) {
-  return (
-    <div style={styles.emptyChart}>
-      {text}
-    </div>
-  )
+  return <div style={styles.emptyChart}>{text}</div>
 }
 
 const styles: any = {
@@ -464,6 +510,17 @@ const styles: any = {
     borderRadius: 12,
     background: "#fdf2f8",
     color: "#db2777",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
+  mapIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    background: "#fef2f2",
+    color: "#dc2626",
     display: "flex",
     alignItems: "center",
     justifyContent: "center"
