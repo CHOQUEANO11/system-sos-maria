@@ -36,6 +36,8 @@ export default function Women() {
   const [viewOpen, setViewOpen] = useState(false)
 
   const [selectedWoman, setSelectedWoman] = useState<any>(null)
+  const [totalWomen, setTotalWomen] = useState(0)
+
 
   const [page, setPage] = useState(1)
   const limit = 10
@@ -56,6 +58,7 @@ export default function Women() {
 
       const response = await api.get("/users", { params })
       setWomen(response.data.data || [])
+      setTotalWomen(response.data.total || 0)
     } catch (error) {
       console.log("Erro ao carregar mulheres", error)
     } finally {
@@ -150,7 +153,8 @@ function formatCPF(value: string) {
               </div>
 
               <div>
-                <h3 style={styles.cardTitle}>Assistidas cadastradas</h3>
+                <h3 style={styles.cardTitle}>Assistidas cadastradas - {totalWomen}</h3>
+
                 <p style={styles.cardSubtitle}>
                   Página {page} • {women.length} registro(s)
                 </p>
