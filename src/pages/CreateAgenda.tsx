@@ -71,8 +71,8 @@ export default function AgendaPage() {
 
     try {
       const [w, m] = await Promise.all([
-        api.get("/users", { params: { role: "WOMAN" } }),
-        api.get("/police", { params: { unidadeId: user?.unidadeId } })
+        api.get("/users", { params: { role: "WOMAN", all: true } }),
+        api.get("/police", { params: { unidadeId: user?.unidadeId, all: true  } })
       ])
 
       setWomen(w.data.data)
@@ -188,8 +188,8 @@ export default function AgendaPage() {
 
     try {
       const [w, m] = await Promise.all([
-        api.get("/users", { params: { role: "WOMAN" } }),
-        api.get("/police", { params: { unidadeId: user?.unidadeId } })
+        api.get("/users", { params: { role: "WOMAN", all: true } }),
+        api.get("/police", { params: { unidadeId: user?.unidadeId, all: true  } })
       ])
 
       setWomen(w.data.data)
