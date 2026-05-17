@@ -2,8 +2,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { colorOptions, educationOptions, raceOptions } from "../../constants/demographics"
 
 export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: any) {
   const [saving, setSaving] = useState(false)
@@ -29,6 +31,10 @@ async function loadKinships() {
   name: "",
   cpf: "",
   rg: "",
+  age: "",
+  race: "",
+  color: "",
+  education: "",
   email: "",
   phone: "",
   address: "",
@@ -46,6 +52,10 @@ async function loadKinships() {
   name: woman.name || "",
   cpf: woman.cpf || "",
   rg: woman.rg || "",
+  age: woman.age || "",
+  race: woman.race || "",
+  color: woman.color || "",
+  education: woman.education || "",
   email: woman.email || "",
   phone: woman.phone || "",
   address: woman.address || "",
@@ -69,20 +79,25 @@ async function loadKinships() {
     if (!woman || saving) return
 
     if (!form.name || !form.cpf) {
-      alert("Preencha nome e CPF.")
+      toast.warning("Preencha nome e CPF.")
       return
     }
 
     try {
       setSaving(true)
 
-      await api.put(`/users/${woman.id}`, { ...form, cpf: form.cpf.replace(/\D/g, "")})
+      await api.put(`/users/${woman.id}`, {
+        ...form,
+        cpf: form.cpf.replace(/\D/g, ""),
+        age: form.age ? Number(form.age) : null
+      })
 
       await onUpdated()
+      toast.success("Cadastro atualizado com sucesso.")
       onClose()
     } catch (error) {
       console.log("Erro ao atualizar mulher", error)
-      alert("Erro ao atualizar cadastro.")
+      toast.error("Erro ao atualizar cadastro.")
     } finally {
       setSaving(false)
     }
@@ -124,6 +139,34 @@ async function loadKinships() {
       label="RG"
       value={form.rg}
       onChange={(value: string) => setForm({ ...form, rg: value })}
+    />
+
+    <Input
+      label="Idade"
+      type="number"
+      value={form.age}
+      onChange={(value: string) => setForm({ ...form, age: value })}
+    />
+
+    <SelectInput
+      label="Raça"
+      value={form.race}
+      options={raceOptions}
+      onChange={(value: string) => setForm({ ...form, race: value })}
+    />
+
+    <SelectInput
+      label="Cor"
+      value={form.color}
+      options={colorOptions}
+      onChange={(value: string) => setForm({ ...form, color: value })}
+    />
+
+    <SelectInput
+      label="Escolaridade"
+      value={form.education}
+      options={educationOptions}
+      onChange={(value: string) => setForm({ ...form, education: value })}
     />
 
     <Input
@@ -223,16 +266,40 @@ function DateInput({ label, value, onChange }: any) {
 }
 
 
-function Input({ label, value, onChange }: any) {
+function Input({ label, value, onChange, type = "text" }: any) {
   return (
     <div>
       <label style={styles.label}>{label}</label>
       <input
+        type={type}
         placeholder={label}
         style={styles.input}
         value={value}
+        min={type === "number" ? 0 : undefined}
         onChange={(e) => onChange(e.target.value)}
       />
+    </div>
+  )
+}
+
+function SelectInput({ label, value, options, onChange }: any) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+
+      <select
+        style={styles.input}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Selecione...</option>
+
+        {options.map((option: string) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

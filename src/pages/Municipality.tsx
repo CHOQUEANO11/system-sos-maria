@@ -73,7 +73,10 @@ export default function Municipalities() {
               </div>
 
               <div>
-                <h3 style={styles.cardTitle}>Municípios cadastrados</h3>
+                <div style={styles.cardTitleRow}>
+                  <h3 style={styles.cardTitle}>Municípios cadastrados</h3>
+                  <span style={styles.totalBadge}>{municipalities.length}</span>
+                </div>
                 <p style={styles.cardSubtitle}>
                   Página {page} • {municipalities.length} registro(s)
                 </p>
@@ -273,6 +276,26 @@ const styles: any = {
     margin: 0,
     color: "#111827",
     fontSize: 18
+  },
+
+  cardTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
+  totalBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 34,
+    padding: "5px 10px",
+    borderRadius: 999,
+    background: "#fdf2f8",
+    color: "#be185d",
+    fontSize: 13,
+    fontWeight: 900
   },
 
   cardSubtitle: {

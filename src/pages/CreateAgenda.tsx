@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import { toast } from "react-toastify"
+import ActionConfirmModal from "../components/modals/ActionConfirmModal"
 
 export default function AgendaPage() {
   const { user } = useAuth()
@@ -18,7 +19,18 @@ export default function AgendaPage() {
   const [women, setWomen] = useState<any[]>([])
   const [militares, setMilitares] = useState<any[]>([])
 
+  const [targetType, setTargetType] = useState<"WOMAN" | "AUTHOR">("WOMAN")
   const [woman, setWoman] = useState<any>(null)
+  const [authorForm, setAuthorForm] = useState<any>({
+    nome: "",
+    rg: "",
+    cpf: "",
+    contato: "",
+    endereco: "",
+    bairro: "",
+    cidade: "",
+    estado: "Pará"
+  })
   const [selectedMilitares, setSelectedMilitares] = useState<any[]>([])
 
   const [searchWoman, setSearchWoman] = useState("")
@@ -27,6 +39,8 @@ export default function AgendaPage() {
   const [date, setDate] = useState("")
   const [time, setTime] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteAgenda, setDeleteAgenda] = useState<any>(null)
+  const [deletingAgenda, setDeletingAgenda] = useState(false)
   const [saving, setSaving] = useState(false)
 
 
@@ -60,7 +74,18 @@ export default function AgendaPage() {
 
   async function openModal() {
     setEditingId(null)
+    setTargetType("WOMAN")
     setWoman(null)
+    setAuthorForm({
+      nome: "",
+      rg: "",
+      cpf: "",
+      contato: "",
+      endereco: "",
+      bairro: "",
+      cidade: "",
+      estado: "Pará"
+    })
     setSelectedMilitares([])
     setSearchWoman("")
     setSearchPolice("")
@@ -115,11 +140,37 @@ export default function AgendaPage() {
     setSelectedMilitares((prev) => prev.filter((m) => m.id !== id))
   }
 
+  function getAuthorPayload() {
+    const name = authorForm.nome?.trim() || ""
+
+    return {
+      name,
+      nome: name,
+      rg: authorForm.rg || "",
+      cpf: authorForm.cpf || "",
+      phone: authorForm.contato || "",
+      contato: authorForm.contato || "",
+      address: authorForm.endereco || "",
+      endereco: authorForm.endereco || "",
+      neighborhood: authorForm.bairro || "",
+      bairro: authorForm.bairro || "",
+      city: authorForm.cidade || "",
+      cidade: authorForm.cidade || "",
+      state: authorForm.estado || "Pará",
+      estado: authorForm.estado || "Pará"
+    }
+  }
+
   async function handleSubmit() {
   if (saving) return
 
-  if (!woman) {
+  if (targetType === "WOMAN" && !woman) {
     toast.warning("Selecione uma assistida")
+    return
+  }
+
+  if (targetType === "AUTHOR" && !authorForm.nome?.trim()) {
+    toast.warning("Informe o nome do autor")
     return
   }
 
@@ -136,9 +187,16 @@ export default function AgendaPage() {
   setSaving(true)
 
   try {
+    const authorPayload = targetType === "AUTHOR" ? getAuthorPayload() : null
+
     const payload = {
-      womanId: woman.id,
+      targetType,
+      agendaType: targetType,
+      womanId: targetType === "WOMAN" ? woman.id : woman?.id || null,
+      author: authorPayload,
+      authorData: authorPayload,
       militares: selectedMilitares.map((m) => m.id),
+      policeIds: selectedMilitares.map((m) => m.id),
       date: new Date(`${date}T${time}`)
     }
 
@@ -152,8 +210,19 @@ export default function AgendaPage() {
 
     setModal(false)
     setEditingId(null)
+    setTargetType("WOMAN")
     setSelectedMilitares([])
     setWoman(null)
+    setAuthorForm({
+      nome: "",
+      rg: "",
+      cpf: "",
+      contato: "",
+      endereco: "",
+      bairro: "",
+      cidade: "",
+      estado: "Pará"
+    })
     setDate("")
     setTime("")
 
@@ -166,16 +235,16 @@ export default function AgendaPage() {
 }
 
   async function handleDelete(id: string) {
-    const confirm = window.confirm("Deseja excluir a escala?")
-
-    if (!confirm) return
-
     try {
+      setDeletingAgenda(true)
       await api.delete(`/agenda/${id}`)
       toast.success("Escala excluída")
+      setDeleteAgenda(null)
       loadAgendas()
     } catch {
       toast.error("Erro ao excluir escala")
+    } finally {
+      setDeletingAgenda(false)
     }
   }
 
@@ -193,7 +262,23 @@ export default function AgendaPage() {
 
       setWomen(w.data.data)
       setMilitares(m.data)
+      setTargetType(
+        agenda.targetType === "AUTHOR" || agenda.agendaType === "AUTHOR"
+          ? "AUTHOR"
+          : "WOMAN"
+      )
       setWoman(agenda.woman)
+      const agendaAuthor = agenda.author || agenda.authorData || agenda.aggressor || agenda.accused || {}
+      setAuthorForm({
+        nome: agendaAuthor.nome || agendaAuthor.name || "",
+        rg: agendaAuthor.rg || "",
+        cpf: agendaAuthor.cpf || "",
+        contato: agendaAuthor.contato || agendaAuthor.phone || "",
+        endereco: agendaAuthor.endereco || agendaAuthor.address || "",
+        bairro: agendaAuthor.bairro || agendaAuthor.neighborhood || "",
+        cidade: agendaAuthor.cidade || agendaAuthor.city || agenda.municipality?.name || "",
+        estado: agendaAuthor.estado || agendaAuthor.state || "Pará"
+      })
       setSelectedMilitares(agenda.militares.map((m: any) => m.police))
 
       const d = new Date(agenda.date)
@@ -230,6 +315,10 @@ export default function AgendaPage() {
     (page - 1) * limit,
     page * limit
   )
+
+  function getAgendaAuthor(agenda: any) {
+    return agenda.author || agenda.authorData || agenda.aggressor || agenda.accused || {}
+  }
 
   if (loading) {
     return (
@@ -280,15 +369,26 @@ export default function AgendaPage() {
                 <div style={styles.cardHeader}>
                   <div>
                     <strong style={styles.womanName}>
-                      {a.woman?.name}
+                      {a.targetType === "AUTHOR" || a.agendaType === "AUTHOR"
+                        ? getAgendaAuthor(a).nome || getAgendaAuthor(a).name || "Autor não informado"
+                        : a.woman?.name}
                     </strong>
 
+                    <span style={a.targetType === "AUTHOR" || a.agendaType === "AUTHOR" ? styles.authorBadge : styles.womanBadge}>
+                      {a.targetType === "AUTHOR" || a.agendaType === "AUTHOR" ? "Autor" : "Assistida"}
+                    </span>
+
                     <p style={styles.infoText}>
-                      {a.woman?.address || "Endereço não informado"}
+                      {a.targetType === "AUTHOR" || a.agendaType === "AUTHOR"
+                        ? getAgendaAuthor(a).endereco || getAgendaAuthor(a).address || "Endereço não informado"
+                        : a.woman?.address || "Endereço não informado"}
                     </p>
 
                     <p style={styles.infoText}>
-                      Contato: {a.woman?.phone || "Não informado"}
+                      Contato:{" "}
+                      {a.targetType === "AUTHOR" || a.agendaType === "AUTHOR"
+                        ? getAgendaAuthor(a).contato || getAgendaAuthor(a).phone || "Não informado"
+                        : a.woman?.phone || "Não informado"}
                     </p>
                   </div>
 
@@ -331,7 +431,7 @@ export default function AgendaPage() {
 
                   <button
                     style={styles.btnDelete}
-                    onClick={() => handleDelete(a.id)}
+                    onClick={() => setDeleteAgenda(a)}
                   >
                     Excluir
                   </button>
@@ -372,6 +472,26 @@ export default function AgendaPage() {
             <div style={modalStyles.formGrid}>
               <div style={modalStyles.leftColumn}>
                 <div style={styles.panel}>
+                  <div style={styles.segmented}>
+                    <button
+                      type="button"
+                      style={targetType === "WOMAN" ? styles.segmentActive : styles.segment}
+                      onClick={() => setTargetType("WOMAN")}
+                    >
+                      Assistida
+                    </button>
+
+                    <button
+                      type="button"
+                      style={targetType === "AUTHOR" ? styles.segmentActive : styles.segment}
+                      onClick={() => setTargetType("AUTHOR")}
+                    >
+                      Autor / Agressor
+                    </button>
+                  </div>
+
+                  {targetType === "WOMAN" ? (
+                  <>
                   <div style={styles.panelHeader}>
                     <div>
                       <h3 style={styles.panelTitle}>Assistida</h3>
@@ -433,6 +553,119 @@ export default function AgendaPage() {
                       })
                     )}
                   </div>
+                  </>
+                  ) : (
+                    <>
+                      <div style={styles.panelHeader}>
+                        <div>
+                          <h3 style={styles.panelTitle}>Autor / Agressor</h3>
+                          <p style={styles.panelSubtitle}>
+                            Dados básicos para criar a agenda.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={styles.authorGrid}>
+                        <input
+                          placeholder="Nome do autor"
+                          style={styles.input}
+                          value={authorForm.nome}
+                          onChange={(e) => setAuthorForm({ ...authorForm, nome: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="RG"
+                          style={styles.input}
+                          value={authorForm.rg}
+                          onChange={(e) => setAuthorForm({ ...authorForm, rg: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="CPF"
+                          style={styles.input}
+                          value={authorForm.cpf}
+                          onChange={(e) => setAuthorForm({ ...authorForm, cpf: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="Contato"
+                          style={styles.input}
+                          value={authorForm.contato}
+                          onChange={(e) => setAuthorForm({ ...authorForm, contato: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="Endereço"
+                          style={styles.input}
+                          value={authorForm.endereco}
+                          onChange={(e) => setAuthorForm({ ...authorForm, endereco: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="Bairro"
+                          style={styles.input}
+                          value={authorForm.bairro}
+                          onChange={(e) => setAuthorForm({ ...authorForm, bairro: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="Cidade"
+                          style={styles.input}
+                          value={authorForm.cidade}
+                          onChange={(e) => setAuthorForm({ ...authorForm, cidade: e.target.value })}
+                        />
+
+                        <input
+                          placeholder="Estado"
+                          style={styles.input}
+                          value={authorForm.estado}
+                          onChange={(e) => setAuthorForm({ ...authorForm, estado: e.target.value })}
+                        />
+                      </div>
+
+                      <div style={styles.linkedWomanBox}>
+                        <h4 style={styles.panelTitle}>Vincular assistida, se houver</h4>
+                        <input
+                          placeholder="Buscar assistida por nome, CPF, RG ou telefone"
+                          style={styles.search}
+                          value={searchWoman}
+                          onChange={(e) => setSearchWoman(e.target.value)}
+                        />
+
+                        {woman && (
+                          <div style={styles.selectedWomanBox}>
+                            <strong>{woman.name}</strong>
+                            <span>CPF: {woman.cpf || "Não informado"}</span>
+                          </div>
+                        )}
+
+                        <div style={styles.resultList}>
+                          {filteredWomen.map((w: any) => {
+                            const selected = woman?.id === w.id
+
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                style={{
+                                  ...styles.personOption,
+                                  ...(selected ? styles.personOptionSelected : {})
+                                }}
+                                onClick={() => setWoman(w)}
+                              >
+                                <div>
+                                  <strong>{w.name}</strong>
+                                  <span>{w.cpf || "CPF não informado"}</span>
+                                </div>
+
+                                <small>{selected ? "Vinculada" : "Vincular"}</small>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -565,6 +798,18 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
+
+      <ActionConfirmModal
+        isOpen={Boolean(deleteAgenda)}
+        onClose={() => setDeleteAgenda(null)}
+        onConfirm={() => deleteAgenda && handleDelete(deleteAgenda.id)}
+        title="Excluir escala"
+        message="Deseja excluir esta escala?"
+        helper="A agenda deixará de aparecer para os militares escalados."
+        confirmText="Excluir"
+        loading={deletingAgenda}
+        variant="danger"
+      />
     </div>
   )
 }
@@ -681,6 +926,30 @@ const styles: any = {
     marginBottom: 6
   },
 
+  womanBadge: {
+    display: "inline-block",
+    background: "#fdf2f8",
+    color: "#be185d",
+    border: "1px solid #fbcfe8",
+    borderRadius: 999,
+    padding: "4px 9px",
+    fontSize: 12,
+    fontWeight: 800,
+    marginBottom: 6
+  },
+
+  authorBadge: {
+    display: "inline-block",
+    background: "#fff7ed",
+    color: "#c2410c",
+    border: "1px solid #fed7aa",
+    borderRadius: 999,
+    padding: "4px 9px",
+    fontSize: 12,
+    fontWeight: 800,
+    marginBottom: 6
+  },
+
   infoText: {
     margin: "4px 0",
     color: "#6b7280",
@@ -771,6 +1040,33 @@ const styles: any = {
     background: "#fff"
   },
 
+  segmented: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    marginBottom: 14
+  },
+
+  segment: {
+    border: "1px solid #e5e7eb",
+    background: "#fff",
+    color: "#374151",
+    borderRadius: 10,
+    padding: "10px",
+    cursor: "pointer",
+    fontWeight: 800
+  },
+
+  segmentActive: {
+    border: "1px solid #ec4899",
+    background: "#fdf2f8",
+    color: "#be185d",
+    borderRadius: 10,
+    padding: "10px",
+    cursor: "pointer",
+    fontWeight: 900
+  },
+
   panelHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -856,6 +1152,18 @@ const styles: any = {
     flexDirection: "column",
     gap: 4,
     color: "#831843"
+  },
+
+  authorGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+    gap: 10,
+    marginBottom: 14
+  },
+
+  linkedWomanBox: {
+    borderTop: "1px solid #f1f5f9",
+    paddingTop: 14
   },
 
   selectedPoliceArea: {

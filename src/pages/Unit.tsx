@@ -141,7 +141,10 @@ export default function Unidades() {
               </div>
 
               <div>
-                <h3 style={styles.cardTitle}>Unidades cadastradas</h3>
+                <div style={styles.cardTitleRow}>
+                  <h3 style={styles.cardTitle}>Unidades cadastradas</h3>
+                  <span style={styles.totalBadge}>{data.length}</span>
+                </div>
                 <p style={styles.cardSubtitle}>
                   {data.length} registro(s) encontrado(s)
                 </p>
@@ -411,6 +414,26 @@ const styles: any = {
     margin: 0,
     color: "#111827",
     fontSize: 18
+  },
+
+  cardTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
+  totalBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 34,
+    padding: "5px 10px",
+    borderRadius: 999,
+    background: "#ecfdf5",
+    color: "#047857",
+    fontSize: 13,
+    fontWeight: 900
   },
 
   cardSubtitle: {

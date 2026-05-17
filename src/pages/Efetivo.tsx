@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useMemo, useState } from "react"
+import { toast } from "react-toastify"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
-import { Plus } from "lucide-react"
+import { FileText, Pencil, Plus, Trash2 } from "lucide-react"
 import CreatePoliceModal from "../components/modals/CreatePoliceModal"
+import EditPoliceModal from "../components/modals/EditPoliceModal"
+import ActionConfirmModal from "../components/modals/ActionConfirmModal"
 
 const graduacaoOrdem = [
   "SOLDADO",
@@ -43,12 +48,17 @@ export default function Police() {
   const { user } = useAuth()
 
   const [police, setPolice] = useState<any[]>([])
+  const [totalPolice, setTotalPolice] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [page, setPage] = useState(1)
   const limit = 10
 
   const [open, setOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [selectedPolice, setSelectedPolice] = useState<any>(null)
 
   const loadPolice = async () => {
     try {
@@ -67,8 +77,10 @@ export default function Police() {
       const res = await api.get("/users", { params })
 
       setPolice(res.data.data || [])
+      setTotalPolice(res.data.total || 0)
     } catch (e) {
       console.log(e)
+      toast.error("Erro ao carregar efetivo.")
     } finally {
       setLoading(false)
     }
@@ -87,7 +99,99 @@ export default function Police() {
     })
   }, [police])
 
-  
+  function handleEdit(policeItem: any) {
+    setSelectedPolice(policeItem)
+    setEditOpen(true)
+  }
+
+  function handleDelete(policeItem: any) {
+    setSelectedPolice(policeItem)
+    setDeleteOpen(true)
+  }
+
+  async function confirmDelete() {
+    if (!selectedPolice || deleting) return
+
+    try {
+      setDeleting(true)
+      await api.delete(`/users/${selectedPolice.id}`)
+      setDeleteOpen(false)
+      setSelectedPolice(null)
+      await loadPolice()
+      toast.success("Policial excluído da lista ativa.")
+    } catch (error) {
+      console.log("Erro ao excluir policial", error)
+      toast.error("Erro ao excluir policial.")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function generatePdf() {
+    try {
+      const params: any = {
+        role: "POLICE",
+        all: true,
+        limit: 9999
+      }
+
+      if (user?.role !== "SUPER_ADMIN") {
+        params.municipalityId = user?.municipalityId
+      }
+
+      const res = await api.get("/users", { params })
+      const rows = sortPolice(res.data.data || [])
+
+      const doc = new jsPDF()
+      doc.setFontSize(16)
+      doc.text("Relatório do Efetivo Policial", 14, 18)
+      doc.setFontSize(10)
+      doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 26)
+
+      autoTable(doc, {
+        startY: 34,
+        head: [["Graduação", "Nome", "Nome de Guerra", "CPF", "Unidade", "Telefone", "Email"]],
+        body: rows.map((item: any) => [
+          item.policeProfile?.graduacao?.name || "-",
+          item.name || "-",
+          item.nomeDeGuerra || "-",
+          item.cpf || "-",
+          item.policeProfile?.unidade?.name || item.unidade?.name || "-",
+          item.phone || "-",
+          item.email || "-"
+        ]),
+        theme: "grid",
+        headStyles: {
+          fillColor: [99, 102, 241],
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2.5,
+          overflow: "linebreak"
+        }
+      })
+
+      const url = URL.createObjectURL(doc.output("blob"))
+      window.open(url, "_blank")
+    } catch (error) {
+      console.log("Erro ao gerar PDF do efetivo", error)
+      toast.error("Erro ao gerar PDF do efetivo.")
+    }
+  }
+
+  function sortPolice(items: any[]) {
+    return [...items].sort((a: any, b: any) => {
+      const gradA = a.policeProfile?.graduacao?.name
+      const gradB = b.policeProfile?.graduacao?.name
+
+      const graduationDiff = getGraduacaoPeso(gradA) - getGraduacaoPeso(gradB)
+      if (graduationDiff !== 0) return graduationDiff
+
+      return String(a.name || "").localeCompare(String(b.name || ""))
+    })
+  }
 
   return (
     <div style={styles.container}>
@@ -99,16 +203,26 @@ export default function Police() {
           </p>
         </div>
 
-        <button style={styles.primaryBtn} onClick={() => setOpen(true)}>
-          <Plus size={18} />
-          Novo Policial
-        </button>
+        <div style={styles.headerActions}>
+          <button style={styles.pdfBtn} onClick={generatePdf}>
+            <FileText size={18} />
+            PDF do efetivo
+          </button>
+
+          <button style={styles.primaryBtn} onClick={() => setOpen(true)}>
+            <Plus size={18} />
+            Novo Policial
+          </button>
+        </div>
       </div>
 
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <div>
-            <h3 style={styles.cardTitle}>Policiais cadastrados</h3>
+            <div style={styles.cardTitleRow}>
+              <h3 style={styles.cardTitle}>Policiais cadastrados</h3>
+              <span style={styles.totalBadge}>{totalPolice}</span>
+            </div>
             <p style={styles.cardSubtitle}>
               Página {page} • {police.length} registro(s)
             </p>
@@ -124,13 +238,14 @@ export default function Police() {
                 <th style={styles.th}>CPF</th>
                 <th style={styles.th}>Unidade</th>
                 <th style={styles.th}>Graduação</th>
+                <th style={styles.th}>Ações</th>
               </tr>
             </thead>
 
             <tbody>
               {loading && (
                 <tr>
-                  <td style={styles.loadingCell} colSpan={5}>
+                  <td style={styles.loadingCell} colSpan={6}>
                     Carregando policiais...
                   </td>
                 </tr>
@@ -138,7 +253,7 @@ export default function Police() {
 
               {!loading && policeOrdenados.length === 0 && (
                 <tr>
-                  <td style={styles.emptyCell} colSpan={5}>
+                  <td style={styles.emptyCell} colSpan={6}>
                     Nenhum policial cadastrado
                   </td>
                 </tr>
@@ -167,6 +282,20 @@ export default function Police() {
                       <span style={styles.badge}>
                         {p.policeProfile?.graduacao?.name || "Sem graduação"}
                       </span>
+                    </td>
+
+                    <td style={styles.td}>
+                      <div style={styles.actionGroup}>
+                        <button style={styles.editBtn} onClick={() => handleEdit(p)}>
+                          <Pencil size={15} />
+                          Editar
+                        </button>
+
+                        <button style={styles.deleteBtn} onClick={() => handleDelete(p)}>
+                          <Trash2 size={15} />
+                          Excluir
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -202,6 +331,31 @@ export default function Police() {
         onClose={() => setOpen(false)}
         onCreated={loadPolice}
       />
+
+      <EditPoliceModal
+        isOpen={editOpen}
+        onClose={() => {
+          setEditOpen(false)
+          setSelectedPolice(null)
+        }}
+        onUpdated={loadPolice}
+        police={selectedPolice}
+      />
+
+      <ActionConfirmModal
+        isOpen={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false)
+          setSelectedPolice(null)
+        }}
+        onConfirm={confirmDelete}
+        title="Excluir policial"
+        message={`Deseja excluir ${selectedPolice?.name || "este policial"} da lista ativa?`}
+        helper="O cadastro será desativado e deixará de aparecer no efetivo."
+        confirmText="Excluir"
+        loading={deleting}
+        variant="danger"
+      />
     </div>
   )
 }
@@ -233,6 +387,13 @@ const styles: any = {
     fontSize: 14
   },
 
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
   primaryBtn: {
     display: "flex",
     alignItems: "center",
@@ -245,6 +406,19 @@ const styles: any = {
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 8px 18px rgba(99,102,241,0.25)"
+  },
+
+  pdfBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "11px 16px",
+    background: "#111827",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    fontWeight: 700,
+    cursor: "pointer"
   },
 
   card: {
@@ -266,6 +440,26 @@ const styles: any = {
     margin: 0,
     color: "#111827",
     fontSize: 18
+  },
+
+  cardTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
+  totalBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 34,
+    padding: "5px 10px",
+    borderRadius: 999,
+    background: "#eef2ff",
+    color: "#3730a3",
+    fontSize: 13,
+    fontWeight: 900
   },
 
   cardSubtitle: {
@@ -318,6 +512,41 @@ const styles: any = {
     borderRadius: 999,
     background: "#eef2ff",
     color: "#3730a3",
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  actionGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap"
+  },
+
+  editBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#6366f1",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 800
+  },
+
+  deleteBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#dc2626",
+    color: "#fff",
+    cursor: "pointer",
     fontSize: 12,
     fontWeight: 800
   },

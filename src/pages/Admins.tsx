@@ -20,6 +20,7 @@ export default function Admins() {
   const { user } = useAuth()
 
   const [admins, setAdmins] = useState<Admin[]>([])
+  const [totalAdmins, setTotalAdmins] = useState(0)
   const [loading, setLoading] = useState(false)
 
   const [page, setPage] = useState(1)
@@ -57,6 +58,7 @@ export default function Admins() {
       const response = await api.get("/users", { params })
 
       setAdmins(response.data.data || [])
+      setTotalAdmins(response.data.total || 0)
     } catch (error) {
       console.log("Erro ao carregar admins", error)
     } finally {
@@ -164,7 +166,10 @@ export default function Admins() {
               </div>
 
               <div>
-                <h3 style={styles.cardTitle}>Admins cadastrados</h3>
+                <div style={styles.cardTitleRow}>
+                  <h3 style={styles.cardTitle}>Admins cadastrados</h3>
+                  <span style={styles.totalBadge}>{totalAdmins}</span>
+                </div>
                 <p style={styles.cardSubtitle}>
                   Página {page} • {admins.length} registro(s)
                 </p>
@@ -432,6 +437,26 @@ const styles: any = {
     margin: 0,
     color: "#111827",
     fontSize: 18
+  },
+
+  cardTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+
+  totalBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 34,
+    padding: "5px 10px",
+    borderRadius: 999,
+    background: "#eef2ff",
+    color: "#3730a3",
+    fontSize: 13,
+    fontWeight: 900
   },
 
   cardSubtitle: {
