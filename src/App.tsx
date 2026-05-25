@@ -12,6 +12,7 @@ import Reports from "./pages/Reports"
 import Municipalities from "./pages/Municipality"
 import VisitRequests from "./pages/VisitRequests"
 import AgendaPolicePage from "./pages/AgendaPolicePage"
+import Authors from "./pages/Authors"
 
 // 🔥 NOVAS PAGES
 import Efetivo from "./pages/Efetivo"
@@ -79,6 +80,17 @@ function App() {
             <PrivateRoute>
               <DashboardLayout>
                 <Women />
+              </DashboardLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/authors"
+          element={
+            <PrivateRoute>
+              <DashboardLayout>
+                <Authors />
               </DashboardLayout>
             </PrivateRoute>
           }

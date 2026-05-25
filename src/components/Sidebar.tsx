@@ -11,7 +11,8 @@ import {
   Building2,
   MapPinned,
   CalendarPlus,
-  ClipboardList
+  ClipboardList,
+  UserRoundCheck
 } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import IMG2 from "../../public/sos2.png"
@@ -80,6 +81,12 @@ export default function Sidebar({ open, mobile, toggle }: SidebarProps) {
       label: "Mulheres",
       to: "/women",
       icon: Users,
+      show: isAdminOrSuper
+    },
+    {
+      label: "Autores",
+      to: "/authors",
+      icon: UserRoundCheck,
       show: isAdminOrSuper
     },
     {

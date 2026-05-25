@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Printer,
   BarChart3,
-  MapPinned
+  MapPinned,
+  UserRoundCheck,
+  ClipboardList
 } from "lucide-react"
 
 import { api } from "../services/api"
@@ -36,9 +38,11 @@ export default function Dashboard() {
 
   const [stats, setStats] = useState({
     women: 0,
+    authors: 0,
     admins: 0,
     emergencies: 0,
-    resolved: 0
+    resolved: 0,
+    authorVisits: 0
   })
 
   const [chart, setChart] = useState<any[]>([])
@@ -46,6 +50,8 @@ export default function Dashboard() {
   const [adminsChart, setAdminsChart] = useState<any[]>([])
   const [emergenciesByMunicipality, setEmergenciesByMunicipality] = useState<any[]>([])
   const [visitsByMunicipality, setVisitsByMunicipality] = useState<any[]>([])
+  const [authorsByMunicipality, setAuthorsByMunicipality] = useState<any[]>([])
+  const [authorVisitsByMunicipality, setAuthorVisitsByMunicipality] = useState<any[]>([])
   const [emergencyHeatMap, setEmergencyHeatMap] = useState<any[]>([])
 
   const loadDashboard = async () => {
@@ -62,7 +68,7 @@ export default function Dashboard() {
         params.municipalityId = user?.municipalityId
       }
 
-      const [womenRes, adminsRes, emergenciesRes, appointmentsRes] = await Promise.all([
+      const [womenRes, adminsRes, emergenciesRes, appointmentsRes, authorsRes, authorVisitsRes] = await Promise.all([
         api.get("/users", {
           params: { role: "WOMAN", ...params, all: true }
         }),
@@ -73,12 +79,18 @@ export default function Dashboard() {
 
         api.get("/emergencies", { params }),
 
-        api.get("/appointment/atendimentos", { params })
+        api.get("/appointment/atendimentos", { params }),
+
+        api.get("/authors", { params: { ...params, all: true, limit: 9999 } }).catch(() => ({ data: [] })),
+
+        api.get("/appointment/author-orientations", { params }).catch(() => ({ data: [] }))
       ])
 
       const women = womenRes.data.data || []
       const admins = adminsRes.data.data || []
       const emergencies = emergenciesRes.data.data || []
+      const authors = normalizeList(authorsRes.data)
+      const authorVisitsRaw = normalizeList(authorVisitsRes.data)
       const appointmentsRaw = appointmentsRes.data?.data || appointmentsRes.data || []
       const appointments =
         user?.role === "SUPER_ADMIN"
@@ -95,14 +107,35 @@ export default function Dashboard() {
 
               return municipalityIds.includes(user?.municipalityId)
             })
+      const authorVisits =
+        user?.role === "SUPER_ADMIN"
+          ? authorVisitsRaw
+          : authorVisitsRaw.filter((item: any) => {
+              const municipalityIds = [
+                item.municipalityId,
+                item.municipality?.id,
+                item.author?.woman?.municipalityId,
+                item.author?.woman?.municipality?.id,
+                item.agenda?.municipalityId,
+                item.agenda?.municipality?.id,
+                item.agenda?.author?.woman?.municipalityId,
+                item.agenda?.author?.woman?.municipality?.id
+              ].filter(Boolean)
+
+              if (municipalityIds.length === 0) return true
+
+              return municipalityIds.includes(user?.municipalityId)
+            })
 
       const resolved = emergencies.filter((e: any) => e.status === "RESOLVED")
 
       setStats({
         women: women.length,
+        authors: authors.length,
         admins: admins.length,
         emergencies: emergencies.length,
-        resolved: resolved.length
+        resolved: resolved.length,
+        authorVisits: authorVisits.length
       })
 
       const months: any = {}
@@ -183,6 +216,49 @@ export default function Dashboard() {
 
       setVisitsByMunicipality(municipalityVisitsData)
 
+      const municipalityAuthors: any = {}
+
+      authors.forEach((author: any) => {
+        const municipalityName =
+          author.woman?.municipality?.name ||
+          author.agendas?.[0]?.municipality?.name ||
+          author.cidade ||
+          "Sem município"
+
+        municipalityAuthors[municipalityName] = (municipalityAuthors[municipalityName] || 0) + 1
+      })
+
+      setAuthorsByMunicipality(
+        Object.keys(municipalityAuthors)
+          .map((name) => ({
+            name,
+            autores: municipalityAuthors[name]
+          }))
+          .sort((a, b) => b.autores - a.autores)
+      )
+
+      const municipalityAuthorVisits: any = {}
+
+      authorVisits.forEach((item: any) => {
+        const municipalityName =
+          item.author?.woman?.municipality?.name ||
+          item.agenda?.author?.woman?.municipality?.name ||
+          item.agenda?.municipality?.name ||
+          item.municipality?.name ||
+          "Sem município"
+
+        municipalityAuthorVisits[municipalityName] = (municipalityAuthorVisits[municipalityName] || 0) + 1
+      })
+
+      setAuthorVisitsByMunicipality(
+        Object.keys(municipalityAuthorVisits)
+          .map((name) => ({
+            name,
+            visitas: municipalityAuthorVisits[name]
+          }))
+          .sort((a, b) => b.visitas - a.visitas)
+      )
+
       if (user?.role === "SUPER_ADMIN") {
         const municipalities: any = {}
 
@@ -209,6 +285,12 @@ export default function Dashboard() {
     loadDashboard()
   }, [user])
 
+  function normalizeList(response: any) {
+    if (Array.isArray(response)) return response
+    if (Array.isArray(response?.data)) return response.data
+    return []
+  }
+
   function generateDashboardPdf() {
     const doc = new jsPDF()
 
@@ -226,9 +308,11 @@ export default function Dashboard() {
       head: [["Indicador", "Total"]],
       body: [
         ["Mulheres cadastradas", stats.women],
+        ["Autores cadastrados", stats.authors],
         ["Admins", stats.admins],
         ["Pedidos de ajuda", stats.emergencies],
-        ["Chamados atendidos", stats.resolved]
+        ["Chamados atendidos", stats.resolved],
+        ["Visitas de autores", stats.authorVisits]
       ],
       ...pdfTableTheme()
     })
@@ -249,6 +333,16 @@ export default function Dashboard() {
     ]))
 
     addPdfTable(doc, "Visitas realizadas por município", ["Município", "Visitas"], visitsByMunicipality.map((item) => [
+      item.name,
+      item.visitas
+    ]))
+
+    addPdfTable(doc, "Autores cadastrados por município", ["Município", "Autores"], authorsByMunicipality.map((item) => [
+      item.name,
+      item.autores
+    ]))
+
+    addPdfTable(doc, "Visitas de autores por município", ["Município", "Visitas"], authorVisitsByMunicipality.map((item) => [
       item.name,
       item.visitas
     ]))
@@ -365,6 +459,14 @@ export default function Dashboard() {
         />
 
         <Card
+          title="Autores cadastrados"
+          value={stats.authors}
+          icon={UserRoundCheck}
+          color="#c2410c"
+          bg="#fff7ed"
+        />
+
+        <Card
           title="Admins"
           value={stats.admins}
           icon={ShieldCheck}
@@ -386,6 +488,14 @@ export default function Dashboard() {
           icon={CheckCircle2}
           color="#059669"
           bg="#ecfdf5"
+        />
+
+        <Card
+          title="Visitas de autores"
+          value={stats.authorVisits}
+          icon={ClipboardList}
+          color="#7c3aed"
+          bg="#f5f3ff"
         />
       </div>
 
@@ -490,6 +600,60 @@ export default function Dashboard() {
             </MapContainer>
           </div>
         )}
+      </div>
+
+      <div style={styles.chartGrid}>
+        <div style={styles.chartCard}>
+          <div style={styles.chartHeader}>
+            <div>
+              <h3 style={styles.chartTitle}>Autores cadastrados por município</h3>
+              <p style={styles.chartSubtitle}>
+                Distribuição dos autores vinculados às assistidas.
+              </p>
+            </div>
+
+            <div style={styles.authorIcon}>
+              <UserRoundCheck size={20} />
+            </div>
+          </div>
+
+          {authorsByMunicipality.length === 0 ? (
+            <EmptyChart text="Nenhum autor cadastrado por município." />
+          ) : (
+            <HorizontalBarChart
+              data={authorsByMunicipality}
+              valueKey="autores"
+              labelKey="name"
+              color="#c2410c"
+            />
+          )}
+        </div>
+
+        <div style={styles.chartCard}>
+          <div style={styles.chartHeader}>
+            <div>
+              <h3 style={styles.chartTitle}>Visitas de autores por município</h3>
+              <p style={styles.chartSubtitle}>
+                Total de orientações realizadas com autores/agressores.
+              </p>
+            </div>
+
+            <div style={styles.authorVisitIcon}>
+              <ClipboardList size={20} />
+            </div>
+          </div>
+
+          {authorVisitsByMunicipality.length === 0 ? (
+            <EmptyChart text="Nenhuma visita de autor registrada por município." />
+          ) : (
+            <HorizontalBarChart
+              data={authorVisitsByMunicipality}
+              valueKey="visitas"
+              labelKey="name"
+              color="#7c3aed"
+            />
+          )}
+        </div>
       </div>
 
       <div style={styles.chartCard}>
@@ -906,6 +1070,28 @@ const styles: any = {
     borderRadius: 12,
     background: "#ecfdf5",
     color: "#059669",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
+  authorIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    background: "#fff7ed",
+    color: "#c2410c",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
+  authorVisitIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    background: "#f5f3ff",
+    color: "#7c3aed",
     display: "flex",
     alignItems: "center",
     justifyContent: "center"

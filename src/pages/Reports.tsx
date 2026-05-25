@@ -11,7 +11,8 @@ import {
   Search,
   ShieldCheck,
   Siren,
-  Users
+  Users,
+  UserRoundCheck
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -20,6 +21,7 @@ import { useAuth } from "../context/AuthContext"
 
 type ReportType =
   | "women"
+  | "authors"
   | "demographics"
   | "emergencies"
   | "visitsWomen"
@@ -30,6 +32,7 @@ type ReportType =
 
 const reportOptions = [
   { value: "women", label: "Mulheres por município" },
+  { value: "authors", label: "Autores por município" },
   { value: "demographics", label: "Perfil das mulheres" },
   { value: "emergencies", label: "Pedidos de ajuda" },
   { value: "visitsWomen", label: "Visitas de mulheres" },
@@ -50,6 +53,7 @@ export default function Reports() {
   const [search, setSearch] = useState("")
 
   const [women, setWomen] = useState<any[]>([])
+  const [authors, setAuthors] = useState<any[]>([])
   const [emergencies, setEmergencies] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
   const [followups, setFollowups] = useState<any[]>([])
@@ -72,17 +76,20 @@ export default function Reports() {
         appointmentsRes,
         followupsRes,
         municipalitiesRes,
-        authorVisitsRes
+        authorVisitsRes,
+        authorsRes
       ] = await Promise.all([
         api.get("/users", { params: { role: "WOMAN", all: true, limit: 9999, includeInactive: true, ...params } }),
         api.get("/emergencies", { params: { limit: 9999, ...params } }),
         api.get("/appointment/atendimentos", { params }).catch(() => ({ data: [] })),
         api.get("/appointment/acompanhamentos", { params }).catch(() => ({ data: [] })),
         api.get("/municipalities", { params: { limit: 9999 } }),
-        loadAuthorVisits(params)
+        loadAuthorVisits(params),
+        api.get("/authors", { params: { all: true, limit: 9999, ...params } }).catch(() => ({ data: [] }))
       ])
 
       setWomen(applyScope(normalizeList(womenRes.data)))
+      setAuthors(applyScope(normalizeList(authorsRes.data)))
       setEmergencies(applyScope(normalizeList(emergenciesRes.data)))
       setAppointments(applyScope(normalizeList(appointmentsRes.data)))
       setFollowups(applyScope(normalizeList(followupsRes.data)))
@@ -139,6 +146,7 @@ export default function Reports() {
 
   const currentRows = useMemo(() => {
     if (activeReport === "women") return buildWomenRows()
+    if (activeReport === "authors") return buildAuthorRows()
     if (activeReport === "demographics") return buildDemographicRows()
     if (activeReport === "emergencies") return buildEmergencyRows()
     if (activeReport === "visitsWomen") return buildWomenVisitRows()
@@ -146,10 +154,11 @@ export default function Reports() {
     if (activeReport === "violenceTypes") return buildViolenceRows()
     if (activeReport === "police") return buildPoliceRows()
     return buildMunicipalityRows()
-  }, [activeReport, women, emergencies, appointments, followups, authorVisits, municipalities, municipalityId, startDate, endDate, search])
+  }, [activeReport, women, authors, emergencies, appointments, followups, authorVisits, municipalities, municipalityId, startDate, endDate, search])
 
   const summary = useMemo(() => {
     const filteredWomen = filterBase(women, "createdAt")
+    const filteredAuthors = filterBase(authors, "createdAt")
     const filteredEmergencies = filterBase(emergencies, "createdAt")
     const filteredAppointments = filterBase(appointments, "createdAt")
     const filteredFollowups = filterBase(followups, "createdAt")
@@ -157,11 +166,12 @@ export default function Reports() {
 
     return [
       { label: "Mulheres", value: filteredWomen.length, color: "#db2777", bg: "#fdf2f8", icon: Users },
+      { label: "Autores", value: filteredAuthors.length, color: "#c2410c", bg: "#fff7ed", icon: UserRoundCheck },
       { label: "Pedidos de ajuda", value: filteredEmergencies.length, color: "#dc2626", bg: "#fef2f2", icon: Siren },
       { label: "Visitas de mulheres", value: filteredAppointments.length + filteredFollowups.length, color: "#4f46e5", bg: "#eef2ff", icon: ClipboardList },
       { label: "Visitas de autores", value: filteredAuthorVisits.length, color: "#c2410c", bg: "#fff7ed", icon: ShieldCheck }
     ]
-  }, [women, emergencies, appointments, followups, authorVisits, municipalityId, startDate, endDate])
+  }, [women, authors, emergencies, appointments, followups, authorVisits, municipalityId, startDate, endDate])
 
   function filterBase(items: any[], dateField: string) {
     return items.filter((item) => {
@@ -181,6 +191,15 @@ export default function Reports() {
       total: item.total,
       ativas: item.items.filter((w: any) => w.isActive !== false).length,
       inativas: item.items.filter((w: any) => w.isActive === false).length
+    }))
+  }
+
+  function buildAuthorRows() {
+    return groupByMunicipality(filterBase(authors, "createdAt")).map((item) => ({
+      municipio: item.name,
+      total: item.total,
+      comAssistida: item.items.filter((author: any) => author.womanId || author.woman?.id).length,
+      semAssistida: item.items.filter((author: any) => !author.womanId && !author.woman?.id).length
     }))
   }
 
@@ -257,7 +276,8 @@ export default function Reports() {
 
   function buildAuthorVisitRows() {
     return filterBase(authorVisits, "createdAt").map((item) => ({
-      autor: item.nome || item.author?.name || item.agenda?.author?.name || "-",
+      autor: item.nome || item.author?.nome || item.author?.name || item.agenda?.author?.nome || item.agenda?.author?.name || "-",
+      assistida: item.author?.woman?.name || item.agenda?.author?.woman?.name || "-",
       municipio: getMunicipalityName(item),
       data: formatDateTime(item.createdAt || item.dataVisita || item.agenda?.date),
       policial: formatPolice(item),
@@ -301,6 +321,7 @@ export default function Reports() {
       .map((item) => ({
         municipio: item.name || "-",
         mulheres: women.filter((w) => getMunicipalityId(w) === item.id).length,
+        autores: authors.filter((a) => getMunicipalityId(a) === item.id).length,
         pedidos: emergencies.filter((e) => getMunicipalityId(e) === item.id).length,
         visitasMulheres: [...appointments, ...followups].filter((v) => getMunicipalityId(v) === item.id).length,
         visitasAutores: authorVisits.filter((v) => getMunicipalityId(v) === item.id).length
@@ -341,12 +362,29 @@ export default function Reports() {
       item.agenda?.municipalityId ||
       item.agenda?.municipality?.id ||
       item.agenda?.woman?.municipalityId ||
-      item.agenda?.woman?.municipality?.id
+      item.agenda?.woman?.municipality?.id ||
+      item.woman?.municipalityId ||
+      item.woman?.municipality?.id ||
+      item.author?.woman?.municipalityId ||
+      item.author?.woman?.municipality?.id ||
+      item.agenda?.author?.woman?.municipalityId ||
+      item.agenda?.author?.woman?.municipality?.id
     )
   }
 
   function getUnidadeId(item: any) {
-    return item.unidadeId || item.unidade?.id || item.agenda?.unidadeId || item.agenda?.unidade?.id
+    return (
+      item.unidadeId ||
+      item.unidade?.id ||
+      item.woman?.unidadeId ||
+      item.woman?.unidade?.id ||
+      item.author?.woman?.unidadeId ||
+      item.author?.woman?.unidade?.id ||
+      item.agenda?.unidadeId ||
+      item.agenda?.unidade?.id ||
+      item.agenda?.author?.woman?.unidadeId ||
+      item.agenda?.author?.woman?.unidade?.id
+    )
   }
 
   function getMunicipalityName(item: any) {
@@ -355,6 +393,10 @@ export default function Reports() {
       item.user?.municipality?.name ||
       item.agenda?.municipality?.name ||
       item.agenda?.woman?.municipality?.name ||
+      item.woman?.municipality?.name ||
+      item.author?.woman?.municipality?.name ||
+      item.agenda?.author?.woman?.municipality?.name ||
+      item.cidade ||
       "Sem município"
     )
   }
@@ -377,24 +419,26 @@ export default function Reports() {
 
   function getColumns() {
     if (activeReport === "women") return ["Município", "Total", "Ativas", "Inativas"]
+    if (activeReport === "authors") return ["Município", "Autores", "Com assistida", "Sem assistida"]
     if (activeReport === "demographics") return ["Município", "Raça", "Cor", "Escolaridade", "Total", "Média idade"]
     if (activeReport === "emergencies") return ["Município", "Total", "Pendentes", "Em progresso", "Atendidos"]
     if (activeReport === "visitsWomen") return ["Tipo", "Assistida", "Município", "Data", "Policial", "Violência/Atendimento"]
-    if (activeReport === "visitsAuthors") return ["Autor", "Município", "Data", "Policial", "MPU", "Medida protetiva"]
+    if (activeReport === "visitsAuthors") return ["Autor", "Assistida", "Município", "Data", "Policial", "MPU", "Medida protetiva"]
     if (activeReport === "violenceTypes") return ["Tipo de violência", "Total"]
     if (activeReport === "police") return ["Policial", "Total"]
-    return ["Município", "Mulheres", "Pedidos", "Visitas mulheres", "Visitas autores"]
+    return ["Município", "Mulheres", "Autores", "Pedidos", "Visitas mulheres", "Visitas autores"]
   }
 
   function getRowValues(row: any) {
     if (activeReport === "women") return [row.municipio, row.total, row.ativas, row.inativas]
+    if (activeReport === "authors") return [row.municipio, row.total, row.comAssistida, row.semAssistida]
     if (activeReport === "demographics") return [row.municipio, row.race, row.color, row.education, row.total, row.mediaIdade]
     if (activeReport === "emergencies") return [row.municipio, row.total, row.pendentes, row.emProgresso, row.atendidos]
     if (activeReport === "visitsWomen") return [row.tipo, row.assistida, row.municipio, row.data, row.policial, row.violencia]
-    if (activeReport === "visitsAuthors") return [row.autor, row.municipio, row.data, row.policial, row.mpu, row.cienteMedida]
+    if (activeReport === "visitsAuthors") return [row.autor, row.assistida, row.municipio, row.data, row.policial, row.mpu, row.cienteMedida]
     if (activeReport === "violenceTypes") return [row.tipo, row.total]
     if (activeReport === "police") return [row.policial, row.total]
-    return [row.municipio, row.mulheres, row.pedidos, row.visitasMulheres, row.visitasAutores]
+    return [row.municipio, row.mulheres, row.autores, row.pedidos, row.visitasMulheres, row.visitasAutores]
   }
 
   function openPdf(doc: jsPDF) {
@@ -483,6 +527,28 @@ export default function Reports() {
         traduzirStatus(e.status),
         e.createdAt ? new Date(e.createdAt).toLocaleString("pt-BR") : "-",
         e.user?.phone || "-"
+      ])
+    })
+
+    openPdf(doc)
+  }
+
+  async function gerarRelatorioAutores() {
+    const doc = new jsPDF()
+    header(doc, "Relatório de Autores Cadastrados")
+
+    autoTable(doc, {
+      ...tableTheme(),
+      startY: 42,
+      head: [["Autor", "CPF", "RG", "Telefone", "Assistida vinculada", "Município", "Endereço"]],
+      body: filterBase(authors, "createdAt").map((author: any) => [
+        author.nome || "-",
+        author.cpf || "-",
+        author.rg || "-",
+        author.telefone || "-",
+        author.woman?.name || "-",
+        getMunicipalityName(author),
+        [author.endereco, author.bairro, author.cidade, author.estado].filter(Boolean).join(", ") || "-"
       ])
     })
 
@@ -646,6 +712,15 @@ export default function Reports() {
           color="#ef4444"
           bg="#fef2f2"
           onClick={gerarRelatorioEmergencias}
+        />
+
+        <ReportCard
+          icon={UserRoundCheck}
+          title="Autores cadastrados"
+          description="Autores, assistida vinculada, município e contatos."
+          color="#c2410c"
+          bg="#fff7ed"
+          onClick={gerarRelatorioAutores}
         />
 
         <ReportCard

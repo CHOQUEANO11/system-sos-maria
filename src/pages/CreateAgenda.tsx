@@ -17,23 +17,16 @@ export default function AgendaPage() {
   const [modal, setModal] = useState(false)
 
   const [women, setWomen] = useState<any[]>([])
+  const [authors, setAuthors] = useState<any[]>([])
   const [militares, setMilitares] = useState<any[]>([])
 
   const [targetType, setTargetType] = useState<"WOMAN" | "AUTHOR">("WOMAN")
   const [woman, setWoman] = useState<any>(null)
-  const [authorForm, setAuthorForm] = useState<any>({
-    nome: "",
-    rg: "",
-    cpf: "",
-    contato: "",
-    endereco: "",
-    bairro: "",
-    cidade: "",
-    estado: "Pará"
-  })
+  const [author, setAuthor] = useState<any>(null)
   const [selectedMilitares, setSelectedMilitares] = useState<any[]>([])
 
   const [searchWoman, setSearchWoman] = useState("")
+  const [searchAuthor, setSearchAuthor] = useState("")
   const [searchPolice, setSearchPolice] = useState("")
 
   const [date, setDate] = useState("")
@@ -63,7 +56,12 @@ export default function AgendaPage() {
         params: { unidadeId: user?.unidadeId }
       })
 
-      setAgendas(res.data)
+      const sortedAgendas = [...(res.data || [])].sort(
+        (a: any, b: any) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
+
+      setAgendas(sortedAgendas)
       setPage(1)
     } catch {
       toast.error("Erro ao carregar escalas")
@@ -76,18 +74,10 @@ export default function AgendaPage() {
     setEditingId(null)
     setTargetType("WOMAN")
     setWoman(null)
-    setAuthorForm({
-      nome: "",
-      rg: "",
-      cpf: "",
-      contato: "",
-      endereco: "",
-      bairro: "",
-      cidade: "",
-      estado: "Pará"
-    })
+    setAuthor(null)
     setSelectedMilitares([])
     setSearchWoman("")
+    setSearchAuthor("")
     setSearchPolice("")
     setDate("")
     setTime("")
@@ -95,12 +85,14 @@ export default function AgendaPage() {
     setModal(true)
 
     try {
-      const [w, m] = await Promise.all([
+      const [w, a, m] = await Promise.all([
         api.get("/users", { params: { role: "WOMAN", all: true } }),
+        api.get("/authors", { params: { all: true, limit: 9999 } }),
         api.get("/police", { params: { unidadeId: user?.unidadeId, all: true  } })
       ])
 
-      setWomen(w.data.data)
+      setWomen(normalizeList(w.data))
+      setAuthors(normalizeList(a.data))
       setMilitares(m.data)
     } catch {
       toast.error("Erro ao carregar dados")
@@ -140,25 +132,10 @@ export default function AgendaPage() {
     setSelectedMilitares((prev) => prev.filter((m) => m.id !== id))
   }
 
-  function getAuthorPayload() {
-    const name = authorForm.nome?.trim() || ""
-
-    return {
-      name,
-      nome: name,
-      rg: authorForm.rg || "",
-      cpf: authorForm.cpf || "",
-      phone: authorForm.contato || "",
-      contato: authorForm.contato || "",
-      address: authorForm.endereco || "",
-      endereco: authorForm.endereco || "",
-      neighborhood: authorForm.bairro || "",
-      bairro: authorForm.bairro || "",
-      city: authorForm.cidade || "",
-      cidade: authorForm.cidade || "",
-      state: authorForm.estado || "Pará",
-      estado: authorForm.estado || "Pará"
-    }
+  function normalizeList(data: any) {
+    if (Array.isArray(data)) return data
+    if (Array.isArray(data?.data)) return data.data
+    return []
   }
 
   async function handleSubmit() {
@@ -169,8 +146,8 @@ export default function AgendaPage() {
     return
   }
 
-  if (targetType === "AUTHOR" && !authorForm.nome?.trim()) {
-    toast.warning("Informe o nome do autor")
+  if (targetType === "AUTHOR" && !author) {
+    toast.warning("Selecione um autor")
     return
   }
 
@@ -187,14 +164,11 @@ export default function AgendaPage() {
   setSaving(true)
 
   try {
-    const authorPayload = targetType === "AUTHOR" ? getAuthorPayload() : null
-
     const payload = {
       targetType,
       agendaType: targetType,
-      womanId: targetType === "WOMAN" ? woman.id : woman?.id || null,
-      author: authorPayload,
-      authorData: authorPayload,
+      womanId: targetType === "WOMAN" ? woman.id : null,
+      authorId: targetType === "AUTHOR" ? author.id : null,
       militares: selectedMilitares.map((m) => m.id),
       policeIds: selectedMilitares.map((m) => m.id),
       date: new Date(`${date}T${time}`)
@@ -213,16 +187,7 @@ export default function AgendaPage() {
     setTargetType("WOMAN")
     setSelectedMilitares([])
     setWoman(null)
-    setAuthorForm({
-      nome: "",
-      rg: "",
-      cpf: "",
-      contato: "",
-      endereco: "",
-      bairro: "",
-      cidade: "",
-      estado: "Pará"
-    })
+    setAuthor(null)
     setDate("")
     setTime("")
 
@@ -252,15 +217,20 @@ export default function AgendaPage() {
     setModal(true)
     setEditingId(agenda.id)
     setSearchWoman("")
+    setSearchAuthor("")
     setSearchPolice("")
 
     try {
-      const [w, m] = await Promise.all([
+      const [w, a, m] = await Promise.all([
         api.get("/users", { params: { role: "WOMAN", all: true } }),
+        api.get("/authors", { params: { all: true, limit: 9999 } }),
         api.get("/police", { params: { unidadeId: user?.unidadeId, all: true  } })
       ])
 
-      setWomen(w.data.data)
+      const loadedAuthors = normalizeList(a.data)
+
+      setWomen(normalizeList(w.data))
+      setAuthors(loadedAuthors)
       setMilitares(m.data)
       setTargetType(
         agenda.targetType === "AUTHOR" || agenda.agendaType === "AUTHOR"
@@ -268,17 +238,12 @@ export default function AgendaPage() {
           : "WOMAN"
       )
       setWoman(agenda.woman)
-      const agendaAuthor = agenda.author || agenda.authorData || agenda.aggressor || agenda.accused || {}
-      setAuthorForm({
-        nome: agendaAuthor.nome || agendaAuthor.name || "",
-        rg: agendaAuthor.rg || "",
-        cpf: agendaAuthor.cpf || "",
-        contato: agendaAuthor.contato || agendaAuthor.phone || "",
-        endereco: agendaAuthor.endereco || agendaAuthor.address || "",
-        bairro: agendaAuthor.bairro || agendaAuthor.neighborhood || "",
-        cidade: agendaAuthor.cidade || agendaAuthor.city || agenda.municipality?.name || "",
-        estado: agendaAuthor.estado || agendaAuthor.state || "Pará"
-      })
+      const agendaAuthor = agenda.author || agenda.authorData || agenda.aggressor || agenda.accused || null
+      setAuthor(
+        agendaAuthor?.id
+          ? loadedAuthors.find((item: any) => item.id === agendaAuthor.id) || agendaAuthor
+          : null
+      )
       setSelectedMilitares(agenda.militares.map((m: any) => m.police))
 
       const d = new Date(agenda.date)
@@ -296,6 +261,20 @@ export default function AgendaPage() {
     w.rg?.includes(searchWoman) ||
     w.phone?.includes(searchWoman)
   )
+
+  const filteredAuthors = authors.filter((a: any) => {
+    const term = searchAuthor.toLowerCase()
+
+    return (
+      a.nome?.toLowerCase().includes(term) ||
+      a.cpf?.includes(searchAuthor) ||
+      a.rg?.includes(searchAuthor) ||
+      a.telefone?.includes(searchAuthor) ||
+      a.woman?.name?.toLowerCase().includes(term) ||
+      a.woman?.cpf?.includes(searchAuthor) ||
+      a.woman?.municipality?.name?.toLowerCase().includes(term)
+    )
+  })
 
   const mergedPolice = [
     ...militares,
@@ -383,6 +362,12 @@ export default function AgendaPage() {
                         ? getAgendaAuthor(a).endereco || getAgendaAuthor(a).address || "Endereço não informado"
                         : a.woman?.address || "Endereço não informado"}
                     </p>
+
+                    {(a.targetType === "AUTHOR" || a.agendaType === "AUTHOR") && (
+                      <p style={styles.infoText}>
+                        Assistida vinculada: {getAgendaAuthor(a).woman?.name || "Não informada"}
+                      </p>
+                    )}
 
                     <p style={styles.infoText}>
                       Contato:{" "}
@@ -476,7 +461,10 @@ export default function AgendaPage() {
                     <button
                       type="button"
                       style={targetType === "WOMAN" ? styles.segmentActive : styles.segment}
-                      onClick={() => setTargetType("WOMAN")}
+                      onClick={() => {
+                        setTargetType("WOMAN")
+                        setAuthor(null)
+                      }}
                     >
                       Assistida
                     </button>
@@ -484,7 +472,10 @@ export default function AgendaPage() {
                     <button
                       type="button"
                       style={targetType === "AUTHOR" ? styles.segmentActive : styles.segment}
-                      onClick={() => setTargetType("AUTHOR")}
+                      onClick={() => {
+                        setTargetType("AUTHOR")
+                        setWoman(null)
+                      }}
                     >
                       Autor / Agressor
                     </button>
@@ -560,109 +551,70 @@ export default function AgendaPage() {
                         <div>
                           <h3 style={styles.panelTitle}>Autor / Agressor</h3>
                           <p style={styles.panelSubtitle}>
-                            Dados básicos para criar a agenda.
+                            Selecione um autor cadastrado para criar a escala.
                           </p>
                         </div>
-                      </div>
 
-                      <div style={styles.authorGrid}>
-                        <input
-                          placeholder="Nome do autor"
-                          style={styles.input}
-                          value={authorForm.nome}
-                          onChange={(e) => setAuthorForm({ ...authorForm, nome: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="RG"
-                          style={styles.input}
-                          value={authorForm.rg}
-                          onChange={(e) => setAuthorForm({ ...authorForm, rg: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="CPF"
-                          style={styles.input}
-                          value={authorForm.cpf}
-                          onChange={(e) => setAuthorForm({ ...authorForm, cpf: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="Contato"
-                          style={styles.input}
-                          value={authorForm.contato}
-                          onChange={(e) => setAuthorForm({ ...authorForm, contato: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="Endereço"
-                          style={styles.input}
-                          value={authorForm.endereco}
-                          onChange={(e) => setAuthorForm({ ...authorForm, endereco: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="Bairro"
-                          style={styles.input}
-                          value={authorForm.bairro}
-                          onChange={(e) => setAuthorForm({ ...authorForm, bairro: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="Cidade"
-                          style={styles.input}
-                          value={authorForm.cidade}
-                          onChange={(e) => setAuthorForm({ ...authorForm, cidade: e.target.value })}
-                        />
-
-                        <input
-                          placeholder="Estado"
-                          style={styles.input}
-                          value={authorForm.estado}
-                          onChange={(e) => setAuthorForm({ ...authorForm, estado: e.target.value })}
-                        />
-                      </div>
-
-                      <div style={styles.linkedWomanBox}>
-                        <h4 style={styles.panelTitle}>Vincular assistida, se houver</h4>
-                        <input
-                          placeholder="Buscar assistida por nome, CPF, RG ou telefone"
-                          style={styles.search}
-                          value={searchWoman}
-                          onChange={(e) => setSearchWoman(e.target.value)}
-                        />
-
-                        {woman && (
-                          <div style={styles.selectedWomanBox}>
-                            <strong>{woman.name}</strong>
-                            <span>CPF: {woman.cpf || "Não informado"}</span>
-                          </div>
+                        {author && (
+                          <button
+                            style={styles.clearBtn}
+                            onClick={() => setAuthor(null)}
+                          >
+                            Limpar
+                          </button>
                         )}
+                      </div>
 
-                        <div style={styles.resultList}>
-                          {filteredWomen.map((w: any) => {
-                            const selected = woman?.id === w.id
+                      <input
+                        placeholder="Buscar autor por nome, CPF, RG, telefone ou mulher vinculada"
+                        style={styles.search}
+                        value={searchAuthor}
+                        onChange={(e) => setSearchAuthor(e.target.value)}
+                      />
+
+                      {author && (
+                        <div style={styles.selectedAuthorBox}>
+                          <strong>{author.nome || "Autor sem nome"}</strong>
+                          <div style={styles.authorInfoGrid}>
+                            <span><b>CPF:</b> {author.cpf || "Não informado"}</span>
+                            <span><b>Contato:</b> {author.telefone || "Não informado"}</span>
+                            <span><b>Endereço:</b> {author.endereco || "Não informado"}</span>
+                            <span><b>Assistida vinculada:</b> {author.woman?.name || "Não informada"}</span>
+                            <span><b>Município:</b> {author.woman?.municipality?.name || author.cidade || "Não informado"}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={styles.resultList}>
+                        {filteredAuthors.length === 0 ? (
+                          <p style={styles.emptySmall}>Nenhum autor cadastrado encontrado</p>
+                        ) : (
+                          filteredAuthors.map((item: any) => {
+                            const selected = author?.id === item.id
 
                             return (
                               <button
-                                key={w.id}
+                                key={item.id}
                                 type="button"
                                 style={{
                                   ...styles.personOption,
                                   ...(selected ? styles.personOptionSelected : {})
                                 }}
-                                onClick={() => setWoman(w)}
+                                onClick={() => setAuthor(item)}
                               >
                                 <div>
-                                  <strong>{w.name}</strong>
-                                  <span>{w.cpf || "CPF não informado"}</span>
+                                  <strong>{item.nome}</strong>
+                                  <span>CPF: {item.cpf || "Não informado"}</span>
+                                  <span>
+                                    Mulher: {item.woman?.name || "Não informada"}
+                                  </span>
                                 </div>
 
-                                <small>{selected ? "Vinculada" : "Vincular"}</small>
+                                <small>{selected ? "Selecionado" : "Selecionar"}</small>
                               </button>
                             )
-                          })}
-                        </div>
+                          })
+                        )}
                       </div>
                     </>
                   )}
@@ -1152,6 +1104,26 @@ const styles: any = {
     flexDirection: "column",
     gap: 4,
     color: "#831843"
+  },
+
+  selectedAuthorBox: {
+    border: "1px solid #fed7aa",
+    background: "#fff7ed",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    color: "#9a3412"
+  },
+
+  authorInfoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "8px 14px",
+    marginTop: 8,
+    lineHeight: 1.45
   },
 
   authorGrid: {

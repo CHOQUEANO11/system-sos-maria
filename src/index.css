@@ -31,3 +31,8 @@ body {
 nav a:hover{
   background:#de86bc;
 }
+
+table th,
+table td {
+  text-transform: uppercase;
+}

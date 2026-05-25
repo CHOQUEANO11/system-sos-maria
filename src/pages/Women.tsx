@@ -1,8 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from "react"
-import { Plus, Eye, Pencil, Trash2, Users, UserX, UserCheck } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Plus, Eye, Pencil, Trash2, Users, UserX, UserCheck, Search } from "lucide-react"
 import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
@@ -47,6 +47,7 @@ export default function Women() {
   const [activeStatusOpen, setActiveStatusOpen] = useState(false)
   const [totalWomen, setTotalWomen] = useState(0)
   const [totalActiveWomen, setTotalActiveWomen] = useState(0)
+  const [search, setSearch] = useState("")
 
 
   const [page, setPage] = useState(1)
@@ -58,8 +59,9 @@ export default function Women() {
 
       const params: any = {
         role: "WOMAN",
-        page,
-        limit,
+        page: 1,
+        limit: 9999,
+        all: true,
         includeInactive: true
       }
 
@@ -92,7 +94,41 @@ export default function Women() {
 
   useEffect(() => {
     loadWomen()
-  }, [page])
+  }, [])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
+
+  const filteredWomen = useMemo(() => {
+    const term = search.trim().toLowerCase()
+
+    if (!term) return women
+
+    return women.filter((woman) =>
+      [
+        woman.name,
+        woman.cpf,
+        woman.municipality?.name,
+        woman.status,
+        woman.age,
+        woman.race,
+        woman.color,
+        woman.education,
+        toDateBR(woman.programStartDate),
+        toDateBR(woman.programEndDate)
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term)
+    )
+  }, [women, search])
+
+  const paginatedWomen = useMemo(() => {
+    const start = (page - 1) * limit
+    return filteredWomen.slice(start, start + limit)
+  }, [filteredWomen, page])
 
   function handleView(woman: any) {
     setSelectedWoman(woman)
@@ -266,9 +302,21 @@ function isWomanInactive(woman: any) {
                 </div>
 
                 <p style={styles.cardSubtitle}>
-                  Página {page} • {women.length} registro(s)
+                  Página {page} • {filteredWomen.length} registro(s)
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div style={styles.toolbar}>
+            <div style={styles.searchBox}>
+              <Search size={18} color="#9ca3af" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por nome, CPF, município, status ou perfil"
+                style={styles.searchInput}
+              />
             </div>
           </div>
 
@@ -295,7 +343,7 @@ function isWomanInactive(woman: any) {
                   </tr>
                 )}
 
-                {!loading && women.length === 0 && (
+                {!loading && filteredWomen.length === 0 && (
                   <tr>
                     <td colSpan={7} style={styles.empty}>
                       Nenhuma mulher cadastrada
@@ -304,7 +352,7 @@ function isWomanInactive(woman: any) {
                 )}
 
                 {!loading &&
-                  women.map((woman, index) => {
+                  paginatedWomen.map((woman, index) => {
                     const isInactive = isWomanInactive(woman)
 
                     return (
@@ -410,9 +458,9 @@ function isWomanInactive(woman: any) {
             <span style={styles.pageText}>Página {page}</span>
 
             <button
-              disabled={women.length < limit}
+              disabled={page * limit >= filteredWomen.length}
               onClick={() => setPage(page + 1)}
-              style={women.length < limit ? styles.pageBtnDisabled : styles.pageBtn}
+              style={page * limit >= filteredWomen.length ? styles.pageBtnDisabled : styles.pageBtn}
             >
               Próxima
             </button>
@@ -583,6 +631,36 @@ const styles: any = {
     margin: "4px 0 0",
     color: "#6b7280",
     fontSize: 13
+  },
+
+  toolbar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap"
+  },
+
+  searchBox: {
+    minWidth: 260,
+    flex: "1 1 320px",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "10px 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    background: "#fff"
+  },
+
+  searchInput: {
+    width: "100%",
+    border: "none",
+    outline: "none",
+    fontSize: 14,
+    color: "#111827",
+    background: "transparent"
   },
 
   tableWrapper: {

@@ -2,16 +2,38 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Link } from "react-router-dom"
-import { useEffect, useRef, useState } from "react"
-import { AlertTriangle, Clock, Eye } from "lucide-react"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Clock, Eye, MapPin } from "lucide-react"
+import { io, type Socket } from "socket.io-client"
+import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet"
+import type { LatLngExpression } from "leaflet"
+import L from "leaflet"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import "leaflet/dist/leaflet.css"
+
+import markerIcon from "leaflet/dist/images/marker-icon.png"
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png"
+import markerShadow from "leaflet/dist/images/marker-shadow.png"
+
+delete (L.Icon.Default.prototype as any)._getIconUrl
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow
+})
 
 type Emergency = {
   user: any
   id: string
   createdAt: string
   status: string
+  latitude: number
+  longitude: number
+  municipalityId?: string
+  updatedAt?: string
 }
 
 export default function Emergencies() {
@@ -21,15 +43,19 @@ export default function Emergencies() {
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [now, setNow] = useState(Date.now())
+  const [openMapId, setOpenMapId] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const alertedRef = useRef<Set<string>>(new Set())
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const socketRef = useRef<Socket | null>(null)
 
   const limit = 10
 
   useEffect(() => {
     audioRef.current = new Audio("/som.mp3")
     audioRef.current.volume = 1
+    audioRef.current.loop = true
   }, [])
 
   useEffect(() => {
@@ -42,6 +68,72 @@ export default function Emergencies() {
   }, [page])
 
   useEffect(() => {
+    const socketUrl = String(api.defaults.baseURL || window.location.origin)
+    const socket = io(socketUrl, {
+      auth: {
+        token: localStorage.getItem("token")
+      }
+    })
+
+    socketRef.current = socket
+
+    socket.on("connect", () => {
+      console.log("Socket conectado:", socket.id)
+    })
+
+    socket.on("emergency-created", (emergency: Emergency) => {
+      if (!canReceiveEmergency(emergency)) return
+
+      setEmergencies((prev) => {
+        if (prev.some((item) => item.id === emergency.id)) return prev
+        return [emergency, ...prev].slice(0, limit)
+      })
+
+      setPage(1)
+      playEmergencyAlert()
+      toast.error(
+        `Novo pedido de ajuda: ${emergency.user?.name || "Assistida não informada"}`,
+        { autoClose: 10000 }
+      )
+    })
+
+    socket.on("emergency-updated", (emergency: Emergency) => {
+      if (!canReceiveEmergency(emergency)) return
+
+      setEmergencies((prev) =>
+        prev.map((item) =>
+          item.id === emergency.id
+            ? { ...item, ...emergency }
+            : item
+        )
+      )
+
+      if (emergency.status === "RESOLVED") {
+        stopEmergencyAlert()
+        alertedRef.current.delete(emergency.id)
+
+        toast.success(
+          `Pedido de ${emergency.user?.name || "assistida"} marcado como atendido`
+        )
+      } else {
+        toast.info(
+          `Pedido de ${emergency.user?.name || "assistida"} atualizado para ${getStatusLabel(emergency.status)}`
+        )
+      }
+    })
+
+    return () => {
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [user?.municipalityId, user?.role, user?.name])
+
+  useEffect(() => {
+    if (!emergencies.some((item) => item.status === "PENDING")) {
+      stopEmergencyAlert()
+      return
+    }
+
     emergencies.forEach((item) => {
       if (item.status !== "PENDING") return
 
@@ -50,7 +142,7 @@ export default function Emergencies() {
 
       if (diffSec > 30 && !alertedRef.current.has(item.id)) {
         alertedRef.current.add(item.id)
-        audioRef.current?.play().catch(() => {})
+        playEmergencySound()
       }
     })
   }, [now, emergencies])
@@ -82,9 +174,92 @@ export default function Emergencies() {
     }
   }
 
+  function canReceiveEmergency(item: Emergency) {
+    if (user?.role === "SUPER_ADMIN" || user?.name === "CIEPAS") return true
+    if (user?.role === "ADMIN") {
+      return item.municipalityId === user?.municipalityId ||
+        item.user?.municipalityId === user?.municipalityId ||
+        item.user?.municipality?.id === user?.municipalityId
+    }
+
+    return false
+  }
+
+  function playEmergencyAlert() {
+    playEmergencySound()
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Novo pedido de ajuda", {
+        body: "Uma assistida acionou o SOS Maria.",
+        icon: "/sos2.png"
+      })
+    } else if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {})
+    }
+  }
+
+  function playEmergencySound() {
+    const audio = audioRef.current
+
+    if (!audio) return
+
+    audio.play().catch(() => {})
+  }
+
+  function stopEmergencyAlert() {
+    const audio = audioRef.current
+
+    if (!audio) return
+
+    audio.pause()
+    audio.currentTime = 0
+  }
+
+  async function markAsResolved(item: Emergency) {
+    try {
+      setUpdatingId(item.id)
+
+      const response = await api.put(`/emergencies/${item.id}/status`, {
+        status: "RESOLVED"
+      })
+
+      const updated = response.data
+
+      setEmergencies((prev) =>
+        prev.map((current) =>
+          current.id === item.id ? { ...current, ...updated } : current
+        )
+      )
+
+      stopEmergencyAlert()
+      alertedRef.current.delete(item.id)
+      toast.success("Pedido marcado como atendido")
+    } catch (error) {
+      console.log("Erro ao atender pedido", error)
+      toast.error("Erro ao marcar pedido como atendido")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
   function getElapsed(createdAt: string) {
     const start = new Date(createdAt).getTime()
     const diff = now - start
+
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  function getAttendanceDuration(item: Emergency) {
+    const endDate = item.updatedAt || item.createdAt
+    const diff = new Date(endDate).getTime() - new Date(item.createdAt).getTime()
+
+    if (!Number.isFinite(diff) || diff < 0) return "-"
 
     const hours = Math.floor(diff / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
@@ -176,52 +351,131 @@ export default function Emergencies() {
               {!loading &&
                 emergencies.map((item, index) => {
                   const date = new Date(item.createdAt)
+                  const isMapOpen = openMapId === item.id
+                  const hasCoordinates = Number.isFinite(Number(item.latitude)) &&
+                    Number.isFinite(Number(item.longitude))
+                  const position: LatLngExpression = [
+                    Number(item.latitude),
+                    Number(item.longitude)
+                  ]
 
                   return (
-                    <tr
-                      key={item.id}
-                      style={{
-                        ...styles.row,
-                        background: index % 2 === 0 ? "#fff" : "#fafafa"
-                      }}
-                    >
-                      <td style={styles.td}>
-                        <strong style={styles.name}>{item.user?.name || "-"}</strong>
-                        <span style={styles.phone}>{item.user?.phone || ""}</span>
-                      </td>
+                    <Fragment key={item.id}>
+                      <tr
+                        style={{
+                          ...styles.row,
+                          background: index % 2 === 0 ? "#fff" : "#fafafa"
+                        }}
+                      >
+                        <td style={styles.td}>
+                          <strong style={styles.name}>{item.user?.name || "-"}</strong>
+                          <span style={styles.phone}>{item.user?.phone || ""}</span>
+                        </td>
 
-                      <td style={styles.td}>
-                        {item.user?.municipality?.name || "-"}
-                      </td>
+                        <td style={styles.td}>
+                          {item.user?.municipality?.name || "-"}
+                        </td>
 
-                      <td style={styles.td}>
-                        {date.toLocaleString("pt-BR")}
-                      </td>
+                        <td style={styles.td}>
+                          {date.toLocaleString("pt-BR")}
+                        </td>
 
-                      <td style={styles.td}>
-                        <span style={getStatusStyle(item.status)}>
-                          {getStatusLabel(item.status)}
-                        </span>
-                      </td>
+                        <td style={styles.td}>
+                          <span style={getStatusStyle(item.status)}>
+                            {getStatusLabel(item.status)}
+                          </span>
+                        </td>
 
-                      <td style={styles.td}>
+                        <td style={styles.td}>
                         {item.status === "PENDING" ? (
                           <span style={{ ...styles.timer, ...getTimerStyle(item.createdAt) }}>
                             <Clock size={14} />
                             {getElapsed(item.createdAt)}
                           </span>
+                        ) : item.status === "RESOLVED" ? (
+                          <span style={styles.attendanceTimer}>
+                            <CheckCircle size={14} />
+                            {getAttendanceDuration(item)}
+                          </span>
                         ) : (
                           "-"
                         )}
-                      </td>
+                        </td>
 
-                      <td style={styles.td}>
-                        <Link to={`/emergency/${item.id}`} style={styles.detailsBtn}>
-                          <Eye size={14} />
-                          Detalhes
-                        </Link>
-                      </td>
-                    </tr>
+                        <td style={styles.td}>
+                          <div style={styles.actionGroup}>
+                            <Link to={`/emergency/${item.id}`} style={styles.detailsBtn}>
+                              <Eye size={14} />
+                              Detalhes
+                            </Link>
+
+                            <button
+                              type="button"
+                              style={hasCoordinates ? styles.mapToggleBtn : styles.mapToggleDisabled}
+                              disabled={!hasCoordinates}
+                              onClick={() => setOpenMapId(isMapOpen ? null : item.id)}
+                            >
+                              <MapPin size={14} />
+                              Mapa
+                              {isMapOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+
+                            {item.status !== "RESOLVED" && (
+                              <button
+                                type="button"
+                                style={styles.resolveBtn}
+                                disabled={updatingId === item.id}
+                                onClick={() => markAsResolved(item)}
+                              >
+                                <CheckCircle size={14} />
+                                {updatingId === item.id ? "Salvando..." : "Atendido"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isMapOpen && hasCoordinates && (
+                        <tr>
+                          <td colSpan={6} style={styles.mapAccordionCell}>
+                            <div style={styles.mapAccordionHeader}>
+                              <div>
+                                <strong style={styles.mapTitle}>
+                                  Local do disparo
+                                </strong>
+                                <p style={styles.mapSubtitle}>
+                                  Latitude {item.latitude} • Longitude {item.longitude}
+                                </p>
+                              </div>
+
+                              <a
+                                href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={styles.openMapsBtn}
+                              >
+                                Direcionar no mapa
+                              </a>
+                            </div>
+
+                            <div style={styles.inlineMap}>
+                              <MapContainer center={position} zoom={16} style={{ height: "100%", width: "100%" }}>
+                                <TileLayer
+                                  attribution="© OpenStreetMap"
+                                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                />
+
+                                <Marker position={position}>
+                                  <Popup>
+                                    {item.user?.name || "Pedido de ajuda"}
+                                  </Popup>
+                                </Marker>
+                              </MapContainer>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
             </tbody>
@@ -278,7 +532,18 @@ const styles: any = {
   timerOk: { color: "#059669" },
   timerWarn: { color: "#d97706" },
   timerDanger: { color: "#dc2626" },
+  attendanceTimer: { display: "inline-flex", alignItems: "center", gap: 6, color: "#047857", fontWeight: 900, fontSize: 13 },
   detailsBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#6366f1", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: 12, fontWeight: 800 },
+  actionGroup: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  mapToggleBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#fdf2f8", color: "#be185d", border: "1px solid #fbcfe8", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" },
+  mapToggleDisabled: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#f3f4f6", color: "#9ca3af", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "not-allowed" },
+  resolveBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#059669", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" },
+  mapAccordionCell: { padding: 16, background: "#f8fafc", borderBottom: "1px solid #e5e7eb" },
+  mapAccordionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" },
+  mapTitle: { color: "#111827", fontSize: 14 },
+  mapSubtitle: { margin: "4px 0 0", color: "#6b7280", fontSize: 12 },
+  openMapsBtn: { display: "inline-flex", alignItems: "center", padding: "9px 12px", background: "#ec4899", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: 12, fontWeight: 800 },
+  inlineMap: { height: 320, borderRadius: 12, overflow: "hidden", border: "1px solid #e5e7eb" },
   pagination: { marginTop: 20, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexWrap: "wrap" },
   pageBtn: { padding: "9px 14px", borderRadius: 9, border: "none", background: "#6366f1", color: "#fff", cursor: "pointer", fontWeight: 800 },
   pageBtnDisabled: { padding: "9px 14px", borderRadius: 9, border: "none", background: "#e5e7eb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 800 },
