@@ -6,6 +6,8 @@ import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
 import { useAuth } from "../../context/AuthContext"
 import { colorOptions, educationOptions, raceOptions } from "../../constants/demographics"
+import { getNeighborhoodSuggestions } from "../../constants/neighborhoods"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 const initialForm = {
   name: "",
@@ -18,6 +20,8 @@ const initialForm = {
   email: "",
   phone: "",
   address: "",
+  neighborhood: "",
+  municipalityId: "",
   processNumber: "",
   aggressorName: "",
   kinshipId: "",
@@ -30,24 +34,49 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
 
   const [form, setForm] = useState<any>(initialForm)
   const [kinships, setKinships] = useState<any[]>([])
+  const [municipalities, setMunicipalities] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setForm(initialForm)
       setSaving(false)
-      loadKinships()
+      loadOptions()
     }
   }, [isOpen])
 
-  async function loadKinships() {
+  async function loadOptions() {
     try {
-      const { data } = await api.get("/kinships")
-      setKinships(data || [])
+      const [kinshipsRes, municipalitiesRes] = await Promise.all([
+        api.get("/kinships"),
+        api.get("/municipalities", { params: { limit: 9999 } })
+      ])
+
+      const loadedMunicipalities = normalizeList(municipalitiesRes.data)
+      const visibleMunicipalities =
+        user?.role === "SUPER_ADMIN"
+          ? loadedMunicipalities
+          : loadedMunicipalities.filter((item: any) => item.id === user?.municipalityId)
+
+      setKinships(kinshipsRes.data || [])
+      setMunicipalities(visibleMunicipalities)
+      setForm({
+        ...initialForm,
+        municipalityId: user?.role === "SUPER_ADMIN" ? "" : user?.municipalityId || ""
+      })
     } catch (error) {
-      console.log("Erro ao carregar parentescos", error)
+      console.log("Erro ao carregar opções do cadastro", error)
     }
   }
+
+  function normalizeList(data: any) {
+    if (Array.isArray(data)) return data
+    if (Array.isArray(data?.data)) return data.data
+    return []
+  }
+
+  const selectedMunicipality = municipalities.find((item) => item.id === form.municipalityId)
+  const neighborhoodSuggestions = getNeighborhoodSuggestions(selectedMunicipality?.name)
 
   async function handleCreate() {
     if (saving) return
@@ -56,6 +85,11 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
 
     if (!form.name || !form.cpf) {
       toast.warning("Preencha nome e CPF.")
+      return
+    }
+
+    if (!form.municipalityId) {
+      toast.warning("Selecione o município.")
       return
     }
 
@@ -68,7 +102,7 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
         age: form.age ? Number(form.age) : null,
         password: "maria@2026",
         role: "WOMAN",
-        municipalityId: user.municipalityId,
+        municipalityId: form.municipalityId || user.municipalityId,
         unidadeId: user.unidadeId
       })
 
@@ -77,7 +111,7 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
       onClose()
     } catch (error) {
       console.log("Erro ao cadastrar mulher", error)
-      toast.error("Erro ao cadastrar mulher.")
+      toast.error(getApiErrorMessage(error, "Erro ao cadastrar mulher."))
     } finally {
       setSaving(false)
     }
@@ -165,6 +199,39 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
           onChange={(value: string) => setForm({ ...form, address: value })}
         />
 
+        <div>
+          <label style={styles.label}>Município</label>
+
+          <select
+            style={styles.input}
+            value={form.municipalityId}
+            onChange={(e) =>
+              setForm({ ...form, municipalityId: e.target.value, neighborhood: "" })
+            }
+          >
+            <option value="">Selecione...</option>
+
+            {municipalities.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <Input
+          label="Bairro"
+          value={form.neighborhood}
+          list="create-woman-neighborhoods"
+          onChange={(value: string) => setForm({ ...form, neighborhood: value })}
+        />
+
+        <datalist id="create-woman-neighborhoods">
+          {neighborhoodSuggestions.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+
         <Input
           label="Número do Processo"
           value={form.processNumber}
@@ -230,7 +297,7 @@ export default function CreateWomanModal({ isOpen, onClose, onCreated }: any) {
   )
 }
 
-function Input({ label, value, onChange, type = "text" }: any) {
+function Input({ label, value, onChange, type = "text", list }: any) {
   return (
     <div>
       <label style={styles.label}>{label}</label>
@@ -240,6 +307,7 @@ function Input({ label, value, onChange, type = "text" }: any) {
         placeholder={label}
         style={styles.input}
         value={value}
+        list={list}
         min={type === "number" ? 0 : undefined}
         onChange={(e) => onChange(e.target.value)}
       />

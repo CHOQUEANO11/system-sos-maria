@@ -5,25 +5,47 @@ import { useEffect, useState } from "react"
 import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { useAuth } from "../../context/AuthContext"
 import { colorOptions, educationOptions, raceOptions } from "../../constants/demographics"
+import { getNeighborhoodSuggestions } from "../../constants/neighborhoods"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function EditWomanModal({ isOpen, onClose, onUpdated, woman }: any) {
+  const { user } = useAuth()
   const [saving, setSaving] = useState(false)
   const [kinships, setKinships] = useState<any[]>([])
+  const [municipalities, setMunicipalities] = useState<any[]>([])
 
 useEffect(() => {
   if (isOpen) {
-    loadKinships()
+    loadOptions()
   }
 }, [isOpen])
 
-async function loadKinships() {
+async function loadOptions() {
   try {
-    const { data } = await api.get("/kinships")
-    setKinships(data || [])
+    const [kinshipsRes, municipalitiesRes] = await Promise.all([
+      api.get("/kinships"),
+      api.get("/municipalities", { params: { limit: 9999 } })
+    ])
+
+    const loadedMunicipalities = normalizeList(municipalitiesRes.data)
+
+    setKinships(kinshipsRes.data || [])
+    setMunicipalities(
+      user?.role === "SUPER_ADMIN"
+        ? loadedMunicipalities
+        : loadedMunicipalities.filter((item: any) => item.id === user?.municipalityId)
+    )
   } catch (error) {
-    console.log("Erro ao carregar parentescos", error)
+    console.log("Erro ao carregar opções do cadastro", error)
   }
+}
+
+function normalizeList(data: any) {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.data)) return data.data
+  return []
 }
 
 
@@ -38,6 +60,8 @@ async function loadKinships() {
   email: "",
   phone: "",
   address: "",
+  neighborhood: "",
+  municipalityId: "",
   processNumber: "",
   aggressorName: "",
   kinshipId: "",
@@ -59,6 +83,8 @@ async function loadKinships() {
   email: woman.email || "",
   phone: woman.phone || "",
   address: woman.address || "",
+  neighborhood: woman.neighborhood || "",
+  municipalityId: woman.municipalityId || woman.municipality?.id || "",
   processNumber: woman.processNumber || "",
   aggressorName: woman.aggressorName || "",
   kinshipId: woman.kinshipId || woman.kinship?.id || "",
@@ -73,6 +99,9 @@ async function loadKinships() {
   if (!value) return ""
   return new Date(value).toISOString().slice(0, 10)
 }
+
+  const selectedMunicipality = municipalities.find((item) => item.id === form.municipalityId)
+  const neighborhoodSuggestions = getNeighborhoodSuggestions(selectedMunicipality?.name)
 
 
   async function handleUpdate() {
@@ -97,7 +126,7 @@ async function loadKinships() {
       onClose()
     } catch (error) {
       console.log("Erro ao atualizar mulher", error)
-      toast.error("Erro ao atualizar cadastro.")
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar cadastro."))
     } finally {
       setSaving(false)
     }
@@ -187,6 +216,37 @@ async function loadKinships() {
       onChange={(value: string) => setForm({ ...form, address: value })}
     />
 
+    <div>
+      <label style={styles.label}>Município</label>
+
+      <select
+        style={styles.input}
+        value={form.municipalityId}
+        onChange={(e) => setForm({ ...form, municipalityId: e.target.value, neighborhood: "" })}
+      >
+        <option value="">Selecione...</option>
+
+        {municipalities.map((item: any) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <Input
+      label="Bairro"
+      value={form.neighborhood}
+      list="edit-woman-neighborhoods"
+      onChange={(value: string) => setForm({ ...form, neighborhood: value })}
+    />
+
+    <datalist id="edit-woman-neighborhoods">
+      {neighborhoodSuggestions.map((item) => (
+        <option key={item} value={item} />
+      ))}
+    </datalist>
+
     <Input
       label="Número do Processo"
       value={form.processNumber}
@@ -266,7 +326,7 @@ function DateInput({ label, value, onChange }: any) {
 }
 
 
-function Input({ label, value, onChange, type = "text" }: any) {
+function Input({ label, value, onChange, type = "text", list }: any) {
   return (
     <div>
       <label style={styles.label}>{label}</label>
@@ -275,6 +335,7 @@ function Input({ label, value, onChange, type = "text" }: any) {
         placeholder={label}
         style={styles.input}
         value={value}
+        list={list}
         min={type === "number" ? 0 : undefined}
         onChange={(e) => onChange(e.target.value)}
       />

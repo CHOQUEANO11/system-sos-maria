@@ -2,9 +2,11 @@
 
 import { Plus, Pencil, Trash2, Shield } from "lucide-react"
 import { useEffect, useState } from "react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import CreateAdminModal from "../components/modals/CreateAdminModal"
+import { getApiErrorMessage } from "../utils/apiError"
 
 type Admin = {
   id: string
@@ -91,7 +93,7 @@ export default function Admins() {
     if (!selectedAdmin || saving) return
 
     if (!form.name || !form.email) {
-      alert("Preencha nome e email.")
+      toast.warning("Preencha nome e email.")
       return
     }
 
@@ -113,9 +115,10 @@ export default function Admins() {
       setSelectedAdmin(null)
 
       await loadAdmins()
+      toast.success("Administrador atualizado com sucesso.")
     } catch (error) {
       console.log("Erro ao atualizar admin", error)
-      alert("Erro ao atualizar administrador.")
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar administrador."))
     } finally {
       setSaving(false)
     }
@@ -135,7 +138,7 @@ export default function Admins() {
       await loadAdmins()
     } catch (error) {
       console.log("Erro ao excluir admin", error)
-      alert("Erro ao excluir administrador.")
+      toast.error(getApiErrorMessage(error, "Erro ao excluir administrador."))
     } finally {
       setDeleting(false)
     }

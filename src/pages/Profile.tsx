@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Save, UserRound } from "lucide-react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import { getApiErrorMessage } from "../utils/apiError"
 
 export default function Profile() {
   const { user } = useAuth()
@@ -38,7 +40,7 @@ export default function Profile() {
     if (!user || saving) return
 
     if (!form.name || !form.email) {
-      alert("Nome e email são obrigatórios.")
+      toast.warning("Nome e email são obrigatórios.")
       return
     }
 
@@ -59,11 +61,11 @@ export default function Profile() {
 
       await api.put(`/users/${user.id}`, payload)
 
-      alert("Perfil atualizado com sucesso")
+      toast.success("Perfil atualizado com sucesso.")
       navigate("/dashboard")
     } catch (error) {
       console.log("Erro ao atualizar perfil", error)
-      alert("Erro ao atualizar perfil")
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar perfil."))
     } finally {
       setSaving(false)
     }

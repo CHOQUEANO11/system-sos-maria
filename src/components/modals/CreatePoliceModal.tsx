@@ -2,9 +2,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useMemo, useState } from "react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
 import { useAuth } from "../../context/AuthContext"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 const ordemGraduacoes = [
   "SOLDADO",
@@ -100,7 +102,7 @@ export default function CreatePoliceModal({ isOpen, onClose, onCreated }: any) {
       !form.unidadeId ||
       !form.graduacaoId
     ) {
-      alert("Preencha nome, nome de guerra, CPF, email, senha, unidade e graduação.")
+      toast.warning("Preencha nome, nome de guerra, CPF, email, senha, unidade e graduação.")
       return
     }
 
@@ -113,10 +115,11 @@ export default function CreatePoliceModal({ isOpen, onClose, onCreated }: any) {
       })
 
       await onCreated()
+      toast.success("Policial cadastrado com sucesso.")
       onClose()
     } catch (error) {
-      console.log(error)
-      alert("Erro ao cadastrar policial.")
+      console.log("Erro ao cadastrar policial", error)
+      toast.error(getApiErrorMessage(error, "Erro ao cadastrar policial."))
     } finally {
       setSaving(false)
     }

@@ -6,6 +6,7 @@ import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
 import { useAuth } from "../../context/AuthContext"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 const ordemGraduacoes = [
   "SOLDADO",
@@ -119,7 +120,7 @@ export default function EditPoliceModal({ isOpen, onClose, onUpdated, police }: 
       onClose()
     } catch (error) {
       console.log("Erro ao atualizar policial", error)
-      toast.error("Erro ao atualizar policial.")
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar policial."))
     } finally {
       setSaving(false)
     }

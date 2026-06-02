@@ -1,8 +1,10 @@
  
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function CreateAdminModal({isOpen,onClose,onCreated}:any){
 
@@ -80,17 +82,17 @@ export default function CreateAdminModal({isOpen,onClose,onCreated}:any){
  const handleCreate = async () => {
 
   if(!form.name || !form.cpf || !form.password){
-    alert("Preencha todos os campos obrigatórios")
+    toast.warning("Preencha todos os campos obrigatórios.")
     return
   }
 
   if(!form.municipalityId){
-    alert("Selecione o município")
+    toast.warning("Selecione o município.")
     return
   }
 
   if(!form.unidadeId){
-    alert("Selecione a unidade")
+    toast.warning("Selecione a unidade.")
     return
   }
 
@@ -104,10 +106,12 @@ export default function CreateAdminModal({isOpen,onClose,onCreated}:any){
     })
 
     onCreated()
+    toast.success("Admin cadastrado com sucesso.")
     onClose()
 
-  }catch{
-    alert("Erro ao cadastrar admin")
+  }catch(error){
+    console.log("Erro ao cadastrar admin", error)
+    toast.error(getApiErrorMessage(error, "Erro ao cadastrar admin."))
   }finally{
     setLoading(false)
   }

@@ -22,8 +22,10 @@ export default function AgendaPolicePage() {
   const [loading, setLoading] = useState(true)
 
   const [busca, setBusca] = useState("")
+  const [buscaHistoricoMulher, setBuscaHistoricoMulher] = useState("")
   const [paginaVisitas, setPaginaVisitas] = useState(1)
   const [paginaAtendimentos, setPaginaAtendimentos] = useState(1)
+  const [paginaHistorico, setPaginaHistorico] = useState(1)
 
   const itensPorPagina = 5
 
@@ -232,6 +234,59 @@ export default function AgendaPolicePage() {
     return Boolean(getAcompanhamentoByAgenda(agendaId))
   }
 
+  function getWomanIdFromAgenda(item: any) {
+    return item?.womanId || item?.woman?.id
+  }
+
+  function getWomanIdFromRecord(item: any) {
+    return (
+      item?.agenda?.womanId ||
+      item?.agenda?.woman?.id ||
+      item?.womanId ||
+      item?.userId
+    )
+  }
+
+  function getAtendimentosByWoman(womanId?: string) {
+    if (!womanId) return []
+    return atendidos.filter((item: any) => getWomanIdFromRecord(item) === womanId)
+  }
+
+  function getAcompanhamentosByWoman(womanId?: string) {
+    if (!womanId) return []
+    return acompanhamentos.filter((item: any) => getWomanIdFromRecord(item) === womanId)
+  }
+
+  function hasAcolhimentoDaMulher(item: any) {
+    return getAtendimentosByWoman(getWomanIdFromAgenda(item)).length > 0
+  }
+
+  function isPrimeiraVisitaDaMulher(item: any) {
+    if (isAgendaAutor(item)) return false
+
+    const womanId = getWomanIdFromAgenda(item)
+    if (!womanId) return !hasAtendimento(item.id)
+
+    const womanAgendas = data
+      .filter((agenda: any) => !isAgendaAutor(agenda) && getWomanIdFromAgenda(agenda) === womanId)
+      .sort((a: any, b: any) => new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime())
+
+    return womanAgendas[0]?.id === item.id
+  }
+
+  function canFillAcolhimento(item: any) {
+    const womanId = getWomanIdFromAgenda(item)
+    const hasPreviousWomanFollowup = getAcompanhamentosByWoman(womanId)
+      .some((record: any) => record.agendaId !== item.id)
+
+    return (
+      !isAgendaAutor(item) &&
+      isPrimeiraVisitaDaMulher(item) &&
+      !hasAcolhimentoDaMulher(item) &&
+      !hasPreviousWomanFollowup
+    )
+  }
+
   function hasOrientacaoAutor(agendaId: string) {
     return orientacoesAutor.some((item: any) => item.agendaId === agendaId)
   }
@@ -263,8 +318,16 @@ export default function AgendaPolicePage() {
     return item.woman || {}
   }
 
-  function isAgendaCompleta(agendaId: string) {
-    return hasAtendimento(agendaId) && hasAcompanhamento(agendaId)
+  function inferBirthDateFromAge(age?: number | string) {
+    if (!age) return ""
+
+    const ageNumber = Number(age)
+    if (!Number.isFinite(ageNumber) || ageNumber <= 0) return ""
+
+    const date = new Date()
+    date.setFullYear(date.getFullYear() - ageNumber)
+
+    return date.toISOString().slice(0, 10)
   }
 
   function isVisitaConcluida(item: any) {
@@ -272,7 +335,7 @@ export default function AgendaPolicePage() {
       return hasOrientacaoAutor(item.id)
     }
 
-    return isAgendaCompleta(item.id)
+    return hasAcompanhamento(item.id)
   }
 
   const visitasPendentes = useMemo(() => {
@@ -420,6 +483,61 @@ export default function AgendaPolicePage() {
   )
 }, [atendimentosPermitidos, acompanhamentosPermitidos, orientacoesAutorPermitidas])
 
+  const historicoMulheres = useMemo(() => {
+    const grouped: any = {}
+
+    function addRecord(item: any, tipo: "ACOLHIMENTO" | "ACOMPANHAMENTO") {
+      const woman = item.agenda?.woman || {}
+      const key = woman.id || item.cpf || item.nome || item.agendaId
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          id: key,
+          name: woman.name || item.nome || "Assistida não informada",
+          cpf: woman.cpf || item.cpf || "-",
+          phone: woman.phone || item.telefone || item.contato || "-",
+          municipality: item.agenda?.municipality?.name || item.cidade || "-",
+          forms: []
+        }
+      }
+
+      grouped[key].forms.push({
+        id: `${tipo}-${item.id}`,
+        tipo,
+        data: item.createdAt || item.dataVisita || item.dataAtendimento || item.agenda?.date,
+        agendaId: item.agendaId,
+        registro: item
+      })
+    }
+
+    atendimentosPermitidos.forEach((item: any) => addRecord(item, "ACOLHIMENTO"))
+    acompanhamentosPermitidos.forEach((item: any) => addRecord(item, "ACOMPANHAMENTO"))
+
+    const term = buscaHistoricoMulher.toLowerCase().trim()
+
+    return Object.values(grouped)
+      .map((item: any) => ({
+        ...item,
+        forms: item.forms.sort((a: any, b: any) => new Date(b.data || 0).getTime() - new Date(a.data || 0).getTime())
+      }))
+      .filter((item: any) => {
+        if (!term) return true
+
+        return [
+          item.name,
+          item.cpf,
+          item.phone,
+          item.municipality,
+          item.forms.map((form: any) => `${form.tipo} ${form.agendaId}`).join(" ")
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(term)
+      })
+      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+  }, [atendimentosPermitidos, acompanhamentosPermitidos, buscaHistoricoMulher])
+
   const atendimentosFiltrados = useMemo(() => {
   const texto = busca.toLowerCase().trim()
 
@@ -453,6 +571,7 @@ export default function AgendaPolicePage() {
 
   const totalPaginasVisitas = Math.ceil(visitasFiltradas.length / itensPorPagina) || 1
   const totalPaginasAtendimentos = Math.ceil(atendimentosFiltrados.length / itensPorPagina) || 1
+  const totalPaginasHistorico = Math.ceil(historicoMulheres.length / itensPorPagina) || 1
 
   const visitasPaginadas = visitasFiltradas.slice(
     (paginaVisitas - 1) * itensPorPagina,
@@ -462,6 +581,11 @@ export default function AgendaPolicePage() {
   const atendimentosPaginados = atendimentosFiltrados.slice(
     (paginaAtendimentos - 1) * itensPorPagina,
     paginaAtendimentos * itensPorPagina
+  )
+
+  const historicoPaginado = historicoMulheres.slice(
+    (paginaHistorico - 1) * itensPorPagina,
+    paginaHistorico * itensPorPagina
   )
 
   function open(item: any) {
@@ -476,6 +600,13 @@ export default function AgendaPolicePage() {
       cidade: pessoa.cidade || item.municipality?.name,
       estado: pessoa.estado || "Pará",
       telefone: pessoa.phone,
+      dataNascimento: inferBirthDateFromAge(pessoa.age),
+      idade: pessoa.age || "",
+      sexo: pessoa.sex || pessoa.gender || "FEMININO",
+      etnia: [pessoa.race, pessoa.color].filter(Boolean).join(" / "),
+      raca: pessoa.race || "",
+      cor: pessoa.color || "",
+      escolaridade: pessoa.education || "",
       parentesco: [],
       tipoViolencia: [],
       descumprimento: []
@@ -552,7 +683,7 @@ export default function AgendaPolicePage() {
   }
 
   function abrirAcolhimento() {
-    if (!selected || hasAtendimento(selected.id)) return
+    if (!selected || !canFillAcolhimento(selected)) return
 
     setModalEscolha(false)
     setModal(true)
@@ -771,7 +902,13 @@ export default function AgendaPolicePage() {
       ["RG", atendimento.rg || "-"],
       ["Telefone", atendimento.telefone || atendimento.agenda?.woman?.phone || "-"],
       ["Cidade", atendimento.cidade || atendimento.agenda?.municipality?.name || "-"],
-      ["Endereço", atendimento.endereco || atendimento.agenda?.woman?.address || "-"]
+      ["Endereço", atendimento.endereco || atendimento.agenda?.woman?.address || "-"],
+      ["Idade", atendimento.idade || atendimento.agenda?.woman?.age || "-"],
+      ["Sexo", atendimento.sexo || "-"],
+      ["Raça", atendimento.raca || atendimento.agenda?.woman?.race || "-"],
+      ["Cor", atendimento.cor || atendimento.agenda?.woman?.color || "-"],
+      ["Etnia/Cor", atendimento.etnia || "-"],
+      ["Escolaridade", atendimento.escolaridade || atendimento.agenda?.woman?.education || "-"]
     ]
   })
 
@@ -1149,7 +1286,8 @@ export default function AgendaPolicePage() {
           {visitasPaginadas.map((item: any) => {
             const pessoa = getPessoaAgenda(item)
             const agendaAutor = isAgendaAutor(item)
-            const atendimentoEnviado = hasAtendimento(item.id)
+            const acolhimentoDaMulherEnviado = hasAcolhimentoDaMulher(item)
+            const acolhimentoDisponivel = canFillAcolhimento(item)
             const acompanhamentoEnviado = hasAcompanhamento(item.id)
             const orientacaoAutorEnviada = hasOrientacaoAutor(item.id)
 
@@ -1167,8 +1305,8 @@ export default function AgendaPolicePage() {
                     </span>
                   ) : (
                     <>
-                  <span style={atendimentoEnviado ? styles.statusOk : styles.statusPendente}>
-                    Acolhimento: {atendimentoEnviado ? "Enviado" : "Pendente"}
+                  <span style={acolhimentoDaMulherEnviado ? styles.statusOk : acolhimentoDisponivel ? styles.statusPendente : styles.statusNeutral}>
+                    Acolhimento: {acolhimentoDaMulherEnviado ? "Enviado" : acolhimentoDisponivel ? "Pendente" : "Somente na primeira visita"}
                   </span>
 
                   <span style={acompanhamentoEnviado ? styles.statusOk : styles.statusPendente}>
@@ -1179,7 +1317,7 @@ export default function AgendaPolicePage() {
                 </div>
 
                 <button style={styles.buton} onClick={() => open(item)}>
-                  {atendimentoEnviado || acompanhamentoEnviado || orientacaoAutorEnviada
+                  {acolhimentoDaMulherEnviado || acompanhamentoEnviado || orientacaoAutorEnviada
                     ? "Continuar Atendimento"
                     : "Iniciar Atendimento"}
                 </button>
@@ -1193,6 +1331,78 @@ export default function AgendaPolicePage() {
           totalPaginas={totalPaginasVisitas}
           setPagina={setPaginaVisitas}
         />
+
+        <div style={styles.historyPanel}>
+          <div style={styles.historyHeader}>
+            <div>
+              <h2 style={styles.historyTitle}>Histórico por Mulher</h2>
+              <p style={styles.historySubtitle}>
+                Busque a assistida e veja todas as visitas com formulários preenchidos.
+              </p>
+            </div>
+          </div>
+
+          <input
+            style={styles.searchInput}
+            value={buscaHistoricoMulher}
+            placeholder="Buscar mulher por nome, CPF, telefone, município ou agenda..."
+            onChange={(e) => {
+              setBuscaHistoricoMulher(e.target.value)
+              setPaginaHistorico(1)
+            }}
+          />
+
+          {historicoMulheres.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#888" }}>
+              Nenhum histórico de formulários encontrado
+            </p>
+          ) : (
+            <div style={styles.historyGrid}>
+              {historicoPaginado.map((mulher: any) => (
+                <div key={mulher.id} style={styles.historyCard}>
+                  <div>
+                    <strong style={styles.historyWomanName}>{mulher.name}</strong>
+                    <p style={styles.historyMeta}>
+                      CPF: {mulher.cpf} • Telefone: {mulher.phone} • Município: {mulher.municipality}
+                    </p>
+                  </div>
+
+                  <div style={styles.historyForms}>
+                    {mulher.forms.map((formulario: any) => (
+                      <div key={formulario.id} style={styles.historyFormRow}>
+                        <div>
+                          <span style={formulario.tipo === "ACOLHIMENTO" ? styles.statusOk : styles.statusNeutral}>
+                            {formulario.tipo === "ACOLHIMENTO" ? "Acolhimento" : "Acompanhamento"}
+                          </span>
+                          <p style={styles.historyMeta}>
+                            Agenda: {formulario.agendaId || "-"} • Data: {formulario.data ? new Date(formulario.data).toLocaleString("pt-BR") : "-"}
+                          </p>
+                        </div>
+
+                        <button
+                          style={styles.btnPdf}
+                          onClick={() =>
+                            formulario.tipo === "ACOLHIMENTO"
+                              ? gerarRelatorioAtendimento(formulario.registro)
+                              : gerarRelatorioAcompanhamento(formulario.registro)
+                          }
+                        >
+                          PDF
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Paginacao
+            pagina={paginaHistorico}
+            totalPaginas={totalPaginasHistorico}
+            setPagina={setPaginaHistorico}
+          />
+        </div>
 
         {modalEscolha && (
           <div style={styles.overlay}>
@@ -1210,11 +1420,15 @@ export default function AgendaPolicePage() {
               ) : (
                 <>
               <button
-                style={selected && hasAtendimento(selected.id) ? styles.btnDisabled : styles.btnPrimary}
-                disabled={selected && hasAtendimento(selected.id)}
+                style={selected && !canFillAcolhimento(selected) ? styles.btnDisabled : styles.btnPrimary}
+                disabled={selected && !canFillAcolhimento(selected)}
                 onClick={abrirAcolhimento}
               >
-                Questionário de Acolhimento
+                {selected && hasAcolhimentoDaMulher(selected)
+                  ? "Acolhimento já preenchido"
+                  : selected && !isPrimeiraVisitaDaMulher(selected)
+                    ? "Acolhimento somente na primeira visita"
+                    : "Questionário de Acolhimento"}
               </button>
 
               <button
@@ -1241,25 +1455,25 @@ export default function AgendaPolicePage() {
 
               <Section title="Identificação da Guarnição">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="componentes" placeholder="Componentes" value={formAutor.componentes || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="mpu" placeholder="Nº da MPU" value={formAutor.mpu || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} type="date" name="dataVisita" value={formAutor.dataVisita || ""} onChange={handleAutorChange} />
+                  <FormInput label="Componentes" name="componentes" value={formAutor.componentes || ""} onChange={handleAutorChange} />
+                  <FormInput label="Nº da MPU" name="mpu" value={formAutor.mpu || ""} onChange={handleAutorChange} />
+                  <FormInput label="Data da visita" type="date" name="dataVisita" value={formAutor.dataVisita || ""} onChange={handleAutorChange} />
                 </div>
               </Section>
 
               <Section title="Informações do Autor">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="nome" placeholder="Nome" value={formAutor.nome || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="rg" placeholder="RG" value={formAutor.rg || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} type="date" name="dataNascimento" value={formAutor.dataNascimento || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="cpf" placeholder="CPF" value={formAutor.cpf || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="endereco" placeholder="Endereço" value={formAutor.endereco || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="perimetro" placeholder="Perímetro" value={formAutor.perimetro || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="bairro" placeholder="Bairro" value={formAutor.bairro || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="cidade" placeholder="Cidade" value={formAutor.cidade || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="estado" placeholder="Estado" value={formAutor.estado || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} name="contato" placeholder="Contato" value={formAutor.contato || ""} onChange={handleAutorChange} />
-                  <input style={styles.input} type="time" name="horaVisita" value={formAutor.horaVisita || ""} onChange={handleAutorChange} />
+                  <FormInput label="Nome" name="nome" value={formAutor.nome || ""} onChange={handleAutorChange} />
+                  <FormInput label="RG" name="rg" value={formAutor.rg || ""} onChange={handleAutorChange} />
+                  <FormInput label="Data de nascimento" type="date" name="dataNascimento" value={formAutor.dataNascimento || ""} onChange={handleAutorChange} />
+                  <FormInput label="CPF" name="cpf" value={formAutor.cpf || ""} onChange={handleAutorChange} />
+                  <FormInput label="Endereço" name="endereco" value={formAutor.endereco || ""} onChange={handleAutorChange} />
+                  <FormInput label="Perímetro" name="perimetro" value={formAutor.perimetro || ""} onChange={handleAutorChange} />
+                  <FormInput label="Bairro" name="bairro" value={formAutor.bairro || ""} onChange={handleAutorChange} />
+                  <FormInput label="Cidade" name="cidade" value={formAutor.cidade || ""} onChange={handleAutorChange} />
+                  <FormInput label="Estado" name="estado" value={formAutor.estado || ""} onChange={handleAutorChange} />
+                  <FormInput label="Contato" name="contato" value={formAutor.contato || ""} onChange={handleAutorChange} />
+                  <FormInput label="Hora da visita" type="time" name="horaVisita" value={formAutor.horaVisita || ""} onChange={handleAutorChange} />
                 </div>
 
                 <Sub title="Sexo" />
@@ -1277,13 +1491,13 @@ export default function AgendaPolicePage() {
                 <Sub title="Grau de parentesco com a denunciante" />
                 <SimpleRadio field="parentescoDenunciante" form={formAutor} setForm={setFormAutor} options={["ESPOSA", "EX CÔNJUGE", "NAMORADO", "MÃE", "FILHA", "MADRASTA", "EX NAMORADA", "OUTRO"]} />
                 {formAutor.parentescoDenunciante === "OUTRO" && (
-                  <input style={styles.input} name="outroParentesco" placeholder="Qual?" value={formAutor.outroParentesco || ""} onChange={handleAutorChange} />
+                  <FormInput label="Outro parentesco" name="outroParentesco" value={formAutor.outroParentesco || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Trabalha?" />
                 <SimpleRadio field="trabalha" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.trabalha === "SIM" && (
-                  <input style={styles.input} name="profissao" placeholder="Qual profissão?" value={formAutor.profissao || ""} onChange={handleAutorChange} />
+                  <FormInput label="Profissão" name="profissao" value={formAutor.profissao || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Renda familiar" />
@@ -1292,20 +1506,20 @@ export default function AgendaPolicePage() {
                 <Sub title="Possui filhos?" />
                 <SimpleRadio field="filhos" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.filhos === "SIM" && (
-                  <input style={styles.input} name="quantidadeFilhos" placeholder="Quantos?" value={formAutor.quantidadeFilhos || ""} onChange={handleAutorChange} />
+                  <FormInput label="Quantidade de filhos" name="quantidadeFilhos" value={formAutor.quantidadeFilhos || ""} onChange={handleAutorChange} />
                 )}
-                <input style={styles.input} name="filhosMoramComVoce" placeholder="Quantos moram com você?" value={formAutor.filhosMoramComVoce || ""} onChange={handleAutorChange} />
+                <FormInput label="Quantos filhos moram com você?" name="filhosMoramComVoce" value={formAutor.filhosMoramComVoce || ""} onChange={handleAutorChange} />
 
                 <Sub title="Possui filhos com a denunciante?" />
                 <SimpleRadio field="filhosDenunciante" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.filhosDenunciante === "SIM" && (
-                  <input style={styles.input} name="quantidadeFilhosDenunciante" placeholder="Quantos?" value={formAutor.quantidadeFilhosDenunciante || ""} onChange={handleAutorChange} />
+                  <FormInput label="Quantidade de filhos com a denunciante" name="quantidadeFilhosDenunciante" value={formAutor.quantidadeFilhosDenunciante || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Participa de programa social?" />
                 <SimpleRadio field="programaSocial" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.programaSocial === "SIM" && (
-                  <input style={styles.input} name="qualProgramaSocial" placeholder="Qual?" value={formAutor.qualProgramaSocial || ""} onChange={handleAutorChange} />
+                  <FormInput label="Qual programa social?" name="qualProgramaSocial" value={formAutor.qualProgramaSocial || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Moradia" />
@@ -1316,14 +1530,14 @@ export default function AgendaPolicePage() {
                 <Sub title="Consome álcool?" />
                 <SimpleRadio field="consomeAlcool" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.consomeAlcool === "SIM" && (
-                  <input style={styles.input} name="quaisAlcool" placeholder="Quais?" value={formAutor.quaisAlcool || ""} onChange={handleAutorChange} />
+                  <FormInput label="Quais bebidas?" name="quaisAlcool" value={formAutor.quaisAlcool || ""} onChange={handleAutorChange} />
                 )}
                 <SimpleRadio field="frequenciaAlcool" form={formAutor} setForm={setFormAutor} options={["SOMENTE EM OCASIÕES ESPECIAIS", "DIARIAMENTE", "NOS FINS DE SEMANA"]} />
 
                 <Sub title="Consome outro tipo de droga?" />
                 <SimpleRadio field="consomeDrogas" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.consomeDrogas === "SIM" && (
-                  <input style={styles.input} name="quaisDrogas" placeholder="Quais?" value={formAutor.quaisDrogas || ""} onChange={handleAutorChange} />
+                  <FormInput label="Quais drogas?" name="quaisDrogas" value={formAutor.quaisDrogas || ""} onChange={handleAutorChange} />
                 )}
                 <SimpleRadio field="frequenciaDrogas" form={formAutor} setForm={setFormAutor} options={["SOMENTE EM OCASIÕES ESPECIAIS", "DIARIAMENTE", "NOS FINS DE SEMANA"]} />
 
@@ -1342,7 +1556,7 @@ export default function AgendaPolicePage() {
                 <SimpleRadio field="cienteMedidaProtetiva" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
 
                 <Sub title="Quando foi a última vez que entrou em contato com a solicitante?" />
-                <textarea style={styles.textarea} name="ultimoContatoSolicitante" value={formAutor.ultimoContatoSolicitante || ""} onChange={handleAutorChange} />
+                <FormTextarea label="Último contato com a solicitante" name="ultimoContatoSolicitante" value={formAutor.ultimoContatoSolicitante || ""} onChange={handleAutorChange} />
 
                 <Sub title="De que forma o contato ocorreu?" />
                 <Options>
@@ -1351,29 +1565,29 @@ export default function AgendaPolicePage() {
                   ))}
                 </Options>
                 {formAutor.formaContato?.includes("OUTRO") && (
-                  <input style={styles.input} name="outraFormaContato" placeholder="Qual?" value={formAutor.outraFormaContato || ""} onChange={handleAutorChange} />
+                  <FormInput label="Outra forma de contato" name="outraFormaContato" value={formAutor.outraFormaContato || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Teve contato com os filhos?" />
                 <SimpleRadio field="contatoFilhos" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM", "NÃO SE APLICA"]} />
 
                 <Sub title="Como o contato com os filhos acontece?" />
-                <textarea style={styles.textarea} name="comoContatoFilhos" value={formAutor.comoContatoFilhos || ""} onChange={handleAutorChange} />
+                <FormTextarea label="Como o contato com os filhos acontece?" name="comoContatoFilhos" value={formAutor.comoContatoFilhos || ""} onChange={handleAutorChange} />
 
                 <Sub title="Com que frequência?" />
                 <SimpleRadio field="frequenciaContato" form={formAutor} setForm={setFormAutor} options={["DIARIAMENTE", "SEMANALMENTE", "MENSALMENTE", "OUTROS"]} />
                 {formAutor.frequenciaContato === "OUTROS" && (
-                  <input style={styles.input} name="outraFrequenciaContato" placeholder="Descreva" value={formAutor.outraFrequenciaContato || ""} onChange={handleAutorChange} />
+                  <FormInput label="Outra frequência" name="outraFrequenciaContato" value={formAutor.outraFrequenciaContato || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Possui antecedentes criminais?" />
                 <SimpleRadio field="antecedentesCriminais" form={formAutor} setForm={setFormAutor} options={["NÃO", "SIM"]} />
                 {formAutor.antecedentesCriminais === "SIM" && (
-                  <input style={styles.input} name="quaisAntecedentes" placeholder="Qual?" value={formAutor.quaisAntecedentes || ""} onChange={handleAutorChange} />
+                  <FormInput label="Quais antecedentes?" name="quaisAntecedentes" value={formAutor.quaisAntecedentes || ""} onChange={handleAutorChange} />
                 )}
 
                 <Sub title="Observações Gerais" />
-                <textarea style={styles.textarea} name="observacoesGerais" value={formAutor.observacoesGerais || ""} onChange={handleAutorChange} />
+                <FormTextarea label="Observações gerais" name="observacoesGerais" value={formAutor.observacoesGerais || ""} onChange={handleAutorChange} />
               </Section>
 
               <div style={styles.actions}>
@@ -1400,28 +1614,28 @@ export default function AgendaPolicePage() {
 
               <Section title="Identificação da Guarnição">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="componentes" placeholder="Componentes" onChange={handleAcompanhamentoChange} />
-                  <input style={styles.input} name="mpu" placeholder="Nº da MPU" onChange={handleAcompanhamentoChange} />
-                  <input style={styles.input} type="date" name="dataAtendimento" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Componentes" name="componentes" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Nº da MPU" name="mpu" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Data do atendimento" type="date" name="dataAtendimento" onChange={handleAcompanhamentoChange} />
                 </div>
               </Section>
 
               <Section title="Informações da Atendida">
                 <div style={styles.grid}>
-                  <input style={styles.input} value={formAcompanhamento.nome || ""} disabled />
-                  <input style={styles.input} value={formAcompanhamento.rg || ""} disabled />
-                  <input style={styles.input} value={formAcompanhamento.cpf || ""} disabled />
-                  <input style={styles.input} type="date" name="dataNascimento" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Nome" value={formAcompanhamento.nome || ""} disabled />
+                  <FormInput label="RG" value={formAcompanhamento.rg || ""} disabled />
+                  <FormInput label="CPF" value={formAcompanhamento.cpf || ""} disabled />
+                  <FormInput label="Data de nascimento" type="date" name="dataNascimento" onChange={handleAcompanhamentoChange} />
                 </div>
 
                 <div style={styles.grid}>
-                  <input style={styles.input} value={formAcompanhamento.endereco || ""} disabled />
-                  <input style={styles.input} name="perimetro" placeholder="Perímetro" onChange={handleAcompanhamentoChange} />
-                  <input style={styles.input} name="bairro" placeholder="Bairro" onChange={handleAcompanhamentoChange} />
-                  <input style={styles.input} value={formAcompanhamento.cidade || ""} disabled />
-                  <input style={styles.input} value={formAcompanhamento.estado || ""} disabled />
-                  <input style={styles.input} value={formAcompanhamento.contato || ""} disabled />
-                  <input style={styles.input} type="time" name="horaVisita" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Endereço" value={formAcompanhamento.endereco || ""} disabled />
+                  <FormInput label="Perímetro" name="perimetro" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Bairro" name="bairro" onChange={handleAcompanhamentoChange} />
+                  <FormInput label="Cidade" value={formAcompanhamento.cidade || ""} disabled />
+                  <FormInput label="Estado" value={formAcompanhamento.estado || ""} disabled />
+                  <FormInput label="Contato" value={formAcompanhamento.contato || ""} disabled />
+                  <FormInput label="Hora da visita" type="time" name="horaVisita" onChange={handleAcompanhamentoChange} />
                 </div>
               </Section>
 
@@ -1484,8 +1698,8 @@ export default function AgendaPolicePage() {
               </Section>
 
               <Section title="Observações Gerais da Solicitante">
-                <textarea
-                  style={styles.textarea}
+                <FormTextarea
+                  label="Observações gerais da solicitante"
                   name="observacoesGerais"
                   onChange={handleAcompanhamentoChange}
                 />
@@ -1516,9 +1730,9 @@ export default function AgendaPolicePage() {
 
               <Section title="Guarnição">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="componentes" placeholder="Componentes" onChange={handleChange} />
-                  <input style={styles.input} name="mpu" placeholder="MPU" onChange={handleChange} />
-                  <input style={styles.input} type="date" name="dataVisita" onChange={handleChange} />
+                  <FormInput label="Componentes" name="componentes" onChange={handleChange} />
+                  <FormInput label="MPU" name="mpu" onChange={handleChange} />
+                  <FormInput label="Data da visita" type="date" name="dataVisita" onChange={handleChange} />
                 </div>
 
                 <div style={styles.militares}>
@@ -1532,35 +1746,89 @@ export default function AgendaPolicePage() {
 
               <Section title="Dados da Atendida">
                 <div style={styles.grid}>
-                  <input style={styles.input} value={form.nome || ""} disabled />
-                  <input style={styles.input} value={form.cpf || ""} disabled />
-                  <input style={styles.input} value={form.rg || ""} disabled />
-                  <input style={styles.input} type="date" name="dataNascimento" onChange={handleChange} />
+                  <FormInput label="Nome" value={form.nome || ""} disabled />
+                  <FormInput label="CPF" value={form.cpf || ""} disabled />
+                  <FormInput label="RG" value={form.rg || ""} disabled />
+                  <FormInput
+                    label="Data de nascimento"
+                    type="date"
+                    name="dataNascimento"
+                    value={form.dataNascimento || ""}
+                    onChange={handleChange}
+                  />
                 </div>
 
                 <div style={styles.grid}>
-                  <input style={styles.input} value={form.endereco || ""} disabled />
-                  <input style={styles.input} value={form.telefone || ""} disabled />
-                  <input style={styles.input} value={form.cidade || ""} disabled />
-                  <input style={styles.input} value={form.estado || ""} disabled />
+                  <FormInput label="Endereço" value={form.endereco || ""} disabled />
+                  <FormInput label="Telefone" value={form.telefone || ""} disabled />
+                  <FormInput label="Cidade" value={form.cidade || ""} disabled />
+                  <FormInput label="Estado" value={form.estado || ""} disabled />
                 </div>
 
                 <div style={styles.grid}>
-                  <input style={styles.input} type="time" name="horaVisita" onChange={handleChange} />
+                  <FormInput label="Hora da visita" type="time" name="horaVisita" onChange={handleChange} />
                 </div>
               </Section>
 
               <Section title="Perfil da Atendida">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="sexo" placeholder="Sexo" onChange={handleChange} />
-                  <input style={styles.input} name="etnia" placeholder="Etnia" onChange={handleChange} />
-                  <input style={styles.input} name="estadoCivil" placeholder="Estado Civil" onChange={handleChange} />
-                  <input style={styles.input} name="escolaridade" placeholder="Escolaridade" onChange={handleChange} />
+                  <FormInput
+                    label="Idade"
+                    name="idade"
+                    value={form.idade || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Sexo"
+                    name="sexo"
+                    value={form.sexo || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Raça"
+                    name="raca"
+                    value={form.raca || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Cor"
+                    name="cor"
+                    value={form.cor || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Etnia/Cor"
+                    name="etnia"
+                    value={form.etnia || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Estado civil"
+                    name="estadoCivil"
+                    value={form.estadoCivil || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Escolaridade"
+                    name="escolaridade"
+                    value={form.escolaridade || ""}
+                    onChange={handleChange}
+                  />
                 </div>
 
                 <div style={styles.grid}>
-                  <input style={styles.input} name="profissao" placeholder="Profissão" onChange={handleChange} />
-                  <input style={styles.input} name="renda" placeholder="Renda" onChange={handleChange} />
+                  <FormInput
+                    label="Profissão"
+                    name="profissao"
+                    value={form.profissao || ""}
+                    onChange={handleChange}
+                  />
+                  <FormInput
+                    label="Renda"
+                    name="renda"
+                    value={form.renda || ""}
+                    onChange={handleChange}
+                  />
 
                   <div style={styles.options}>
                     <label>
@@ -1583,18 +1851,17 @@ export default function AgendaPolicePage() {
                   </div>
 
                   {form.filhos === true && (
-                    <input
-                      style={styles.input}
+                    <FormInput
+                      label="Quantidade de filhos"
                       name="quantidadeFilhos"
-                      placeholder="Quantos filhos?"
                       onChange={handleChange}
                     />
                   )}
                 </div>
 
                 <div style={styles.grid}>
-                  <input style={styles.input} name="moramComVoce" placeholder="Quantos moram com você?" onChange={handleChange} />
-                  <input style={styles.input} name="moradia" placeholder="Moradia" onChange={handleChange} />
+                  <FormInput label="Quantos moram com você?" name="moramComVoce" onChange={handleChange} />
+                  <FormInput label="Moradia" name="moradia" onChange={handleChange} />
                 </div>
               </Section>
 
@@ -1619,14 +1886,18 @@ export default function AgendaPolicePage() {
                 </Options>
 
                 {form.parentesco?.includes("OUTRO") && (
-                  <input style={styles.input} name="outroParentesco" placeholder="Qual?" onChange={handleChange} />
+                  <FormInput label="Outro parentesco" name="outroParentesco" onChange={handleChange} />
                 )}
 
                 <Sub title="Possui filhos com acusado" />
                 <RadioGroup field="filhosAcusado" form={form} setForm={setForm} />
 
                 {form.filhosAcusado === true && (
-                  <input style={styles.input} name="quantidadeFilhosAcusado" placeholder="Quantos?" onChange={handleChange} />
+                  <FormInput
+                    label="Quantidade de filhos com acusado"
+                    name="quantidadeFilhosAcusado"
+                    onChange={handleChange}
+                  />
                 )}
 
                 <Sub title="Medidas protetivas cumpridas" />
@@ -1671,7 +1942,7 @@ export default function AgendaPolicePage() {
                 </Options>
 
                 {form.descumprimento?.includes("OUTROS") && (
-                  <input style={styles.input} name="outroDescumprimento" placeholder="Descreva" onChange={handleChange} />
+                  <FormInput label="Outro descumprimento" name="outroDescumprimento" onChange={handleChange} />
                 )}
 
                 <Sub title="Tipo de violência" />
@@ -1724,10 +1995,10 @@ export default function AgendaPolicePage() {
 
               <Section title="Dados do Acusado">
                 <div style={styles.grid}>
-                  <input style={styles.input} name="nomeAcusado" placeholder="Nome" onChange={handleChange} />
-                  <input style={styles.input} name="cpfAcusado" placeholder="CPF" onChange={handleChange} />
-                  <input style={styles.input} name="rgAcusado" placeholder="RG" onChange={handleChange} />
-                  <input style={styles.input} name="enderecoAcusado" placeholder="Endereço" onChange={handleChange} />
+                  <FormInput label="Nome do acusado" name="nomeAcusado" onChange={handleChange} />
+                  <FormInput label="CPF do acusado" name="cpfAcusado" onChange={handleChange} />
+                  <FormInput label="RG do acusado" name="rgAcusado" onChange={handleChange} />
+                  <FormInput label="Endereço do acusado" name="enderecoAcusado" onChange={handleChange} />
                 </div>
 
                 <Sub title="Situação ocupacional" />
@@ -1755,7 +2026,7 @@ export default function AgendaPolicePage() {
               </Section>
 
               <Section title="Observações">
-                <textarea style={styles.textarea} name="observacoes" onChange={handleChange} />
+                <FormTextarea label="Observações" name="observacoes" onChange={handleChange} />
               </Section>
 
               <div style={styles.actions}>
@@ -1874,6 +2145,24 @@ function Section({ title, children }: any) {
       <h3>{title}</h3>
       {children}
     </div>
+  )
+}
+
+function FormInput({ label, ...props }: any) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.fieldLabel}>{label}</span>
+      <input style={styles.input} placeholder={label} {...props} />
+    </label>
+  )
+}
+
+function FormTextarea({ label, ...props }: any) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.fieldLabel}>{label}</span>
+      <textarea style={styles.textarea} placeholder={label} {...props} />
+    </label>
   )
 }
 
@@ -2041,6 +2330,19 @@ const styles: any = {
     marginBottom: 20
   },
 
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    minWidth: 0
+  },
+
+  fieldLabel: {
+    color: "#374151",
+    fontSize: "12px",
+    fontWeight: 800
+  },
+
   input: {
     padding: "10px",
     borderRadius: "8px",
@@ -2175,6 +2477,88 @@ const styles: any = {
     borderRadius: "8px",
     fontSize: "12px",
     fontWeight: 600
+  },
+
+  statusNeutral: {
+    background: "#eef2ff",
+    color: "#3730a3",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: 600
+  },
+
+  historyPanel: {
+    marginTop: 26,
+    marginBottom: 26,
+    padding: 18,
+    border: "1px solid #e5e7eb",
+    borderRadius: 14,
+    background: "#fff",
+    boxShadow: "0 8px 24px rgba(15,23,42,0.05)"
+  },
+
+  historyHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 12
+  },
+
+  historyTitle: {
+    margin: 0,
+    color: "#111827"
+  },
+
+  historySubtitle: {
+    margin: "4px 0 0",
+    color: "#6b7280",
+    fontSize: 13
+  },
+
+  historyGrid: {
+    display: "grid",
+    gap: 12
+  },
+
+  historyCard: {
+    border: "1px solid #eef2f7",
+    borderRadius: 12,
+    padding: 14,
+    background: "#fafafa"
+  },
+
+  historyWomanName: {
+    display: "block",
+    color: "#111827",
+    fontSize: 16,
+    marginBottom: 4
+  },
+
+  historyMeta: {
+    margin: "4px 0",
+    color: "#6b7280",
+    fontSize: 13
+  },
+
+  historyForms: {
+    display: "grid",
+    gap: 8,
+    marginTop: 10
+  },
+
+  historyFormRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    padding: 10,
+    background: "#fff",
+    flexWrap: "wrap"
   },
 
   pagination: {
