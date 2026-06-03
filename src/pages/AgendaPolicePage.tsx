@@ -2515,10 +2515,11 @@ const styles: any = {
   },
 
   formGroupItem: {
-    border: "1px solid #e5e7eb",
+    border: "1px solid #d1d5db",
+    borderLeft: "5px solid #8e24aa",
     borderRadius: 8,
     padding: 12,
-    background: "#fafafa"
+    background: "#fbfbfd"
   },
 
   formGroupHeader: {
@@ -2537,10 +2538,12 @@ const styles: any = {
   },
 
   card: {
-    border: "1px solid #eee",
-    padding: 15,
+    border: "2px solid #8e24aa",
+    boxShadow: "0 6px 18px rgba(142, 36, 170, 0.12)",
+    padding: 16,
     borderRadius: 10,
-    marginBottom: 10
+    marginBottom: 14,
+    background: "#fff"
   },
 
   buton: {
