@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { Plus, Pencil, Trash2, MapPinned } from "lucide-react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import CreateMunicipalityModal from "../components/modals/CreateMunicipalityModal"
 import DeleteMunicipalityModal from "../components/modals/ModalConfirmDeleteMunicipality"
@@ -36,6 +37,7 @@ export default function Municipalities() {
       setMunicipalities(result)
     } catch (error) {
       console.log("Erro ao carregar municípios", error)
+      toast.error("Erro ao carregar municípios.")
     } finally {
       setLoading(false)
     }

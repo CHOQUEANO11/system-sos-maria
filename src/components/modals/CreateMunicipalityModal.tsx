@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function CreateMunicipalityModal({ isOpen, onClose, onCreated }: any) {
   const [name, setName] = useState("")
@@ -19,7 +21,7 @@ export default function CreateMunicipalityModal({ isOpen, onClose, onCreated }: 
     if (saving) return
 
     if (!name.trim()) {
-      alert("Informe o nome do município.")
+      toast.warning("Informe o nome do município.")
       return
     }
 
@@ -31,10 +33,11 @@ export default function CreateMunicipalityModal({ isOpen, onClose, onCreated }: 
       })
 
       await onCreated()
+      toast.success("Município cadastrado com sucesso.")
       onClose()
     } catch (error) {
       console.log("Erro ao cadastrar município", error)
-      alert("Erro ao cadastrar município.")
+      toast.error(getApiErrorMessage(error, "Erro ao cadastrar município."))
     } finally {
       setSaving(false)
     }

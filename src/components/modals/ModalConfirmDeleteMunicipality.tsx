@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import { AlertTriangle } from "lucide-react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function DeleteMunicipalityModal({
   isOpen,
@@ -23,10 +25,11 @@ export default function DeleteMunicipalityModal({
       await api.delete(`/municipalities/${municipality.id}`)
 
       await onDeleted()
+      toast.success("Município excluído com sucesso.")
       onClose()
     } catch (error) {
       console.log("Erro ao excluir município", error)
-      alert("Erro ao excluir município.")
+      toast.error(getApiErrorMessage(error, "Erro ao excluir município."))
     } finally {
       setDeleting(false)
     }

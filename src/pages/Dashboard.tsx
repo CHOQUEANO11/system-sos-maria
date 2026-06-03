@@ -17,10 +17,12 @@ import {
   UserRoundCheck,
   ClipboardList
 } from "lucide-react"
+import { toast } from "react-toastify"
 
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import DashboardPolice from "./DashboardPolice"
+import { getApiErrorMessage } from "../utils/apiError"
 import "leaflet/dist/leaflet.css"
 
 type CardProps = {
@@ -276,6 +278,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.log("Erro ao carregar dashboard", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar dashboard."))
     } finally {
       setLoading(false)
     }

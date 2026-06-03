@@ -7,6 +7,8 @@ import { api } from "../services/api"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { useAuth } from "../context/AuthContext"
+import { toast } from "react-toastify"
+import { getApiErrorMessage } from "../utils/apiError"
 
 
 export default function AgendaPolicePage() {
@@ -196,6 +198,7 @@ export default function AgendaPolicePage() {
       setAtendidos(response.data)
     } catch (error) {
       console.log("Erro ao carregar atendimentos", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar acolhimentos realizados."))
     }
   }
 
@@ -205,6 +208,7 @@ export default function AgendaPolicePage() {
       setAcompanhamentos(response.data)
     } catch (error) {
       console.log("Erro ao carregar acompanhamentos", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar acompanhamentos realizados."))
     }
   }
 
@@ -816,13 +820,13 @@ export default function AgendaPolicePage() {
       agendaId: selected.id
     })
 
-    alert("Atendimento salvo com sucesso")
+    toast.success("Acolhimento salvo com sucesso.")
     setModal(false)
 
     await carregarDados()
   } catch (error) {
     console.log(error)
-    alert("Erro ao salvar atendimento")
+    toast.error(getApiErrorMessage(error, "Erro ao salvar acolhimento."))
   } finally {
     setSalvandoAtendimento(false)
   }
@@ -846,13 +850,13 @@ export default function AgendaPolicePage() {
       agendaId: selected.id
     })
 
-    alert("Acompanhamento salvo com sucesso")
+    toast.success("Acompanhamento salvo com sucesso.")
     setModalAcompanhamento(false)
 
     await carregarDados()
   } catch (error) {
     console.log(error)
-    alert("Erro ao salvar acompanhamento")
+    toast.error(getApiErrorMessage(error, "Erro ao salvar acompanhamento."))
   } finally {
     setSalvandoAcompanhamento(false)
   }
@@ -881,13 +885,13 @@ export default function AgendaPolicePage() {
       await api.post("/appointment/orientacoes-autor", payload)
     }
 
-    alert("Orientação do autor salva com sucesso")
+    toast.success("Orientação do autor salva com sucesso.")
     setModalAutor(false)
 
     await carregarDados()
   } catch (error) {
     console.log(error)
-    alert("Erro ao salvar orientação do autor")
+    toast.error(getApiErrorMessage(error, "Erro ao salvar orientação do autor."))
   } finally {
     setSalvandoAutor(false)
   }

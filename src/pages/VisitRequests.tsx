@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ClipboardList, Search } from "lucide-react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import { getApiErrorMessage } from "../utils/apiError"
 
 export default function VisitRequests() {
   const { user } = useAuth()
@@ -29,6 +31,7 @@ export default function VisitRequests() {
       setRequests(res.data || [])
     } catch (error) {
       console.log("Erro ao carregar solicitações", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar solicitações."))
     } finally {
       setLoading(false)
     }

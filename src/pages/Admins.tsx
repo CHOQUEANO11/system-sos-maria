@@ -63,6 +63,7 @@ export default function Admins() {
       setTotalAdmins(response.data.total || 0)
     } catch (error) {
       console.log("Erro ao carregar admins", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar administradores."))
     } finally {
       setLoading(false)
     }

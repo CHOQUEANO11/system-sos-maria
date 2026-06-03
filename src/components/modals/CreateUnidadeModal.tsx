@@ -3,8 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react"
+import { toast } from "react-toastify"
 import ModalBase from "./ModalBase"
 import { api } from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 const initialForm = {
   name: "",
@@ -27,6 +29,7 @@ export default function CreateUnidadeModal({ isOpen, onClose, onCreated }: any) 
       setMunicipalities(res.data.data || res.data || [])
     } catch (error) {
       console.log("Erro ao carregar municípios", error)
+      toast.error("Erro ao carregar municípios.")
     } finally {
       setLoading(false)
     }
@@ -43,7 +46,7 @@ export default function CreateUnidadeModal({ isOpen, onClose, onCreated }: any) 
     if (saving) return
 
     if (!form.name || !form.municipalityId) {
-      alert("Preencha o nome e selecione o município.")
+      toast.warning("Preencha o nome e selecione o município.")
       return
     }
 
@@ -53,10 +56,11 @@ export default function CreateUnidadeModal({ isOpen, onClose, onCreated }: any) 
       await api.post("/unidades", form)
 
       await onCreated()
+      toast.success("Unidade cadastrada com sucesso.")
       onClose()
     } catch (error) {
       console.log("Erro ao cadastrar unidade", error)
-      alert("Erro ao cadastrar unidade.")
+      toast.error(getApiErrorMessage(error, "Erro ao cadastrar unidade."))
     } finally {
       setSaving(false)
     }

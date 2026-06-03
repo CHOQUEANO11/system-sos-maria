@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { Building2, Pencil, Plus, Trash2 } from "lucide-react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
 import CreateUnidadeModal from "../components/modals/CreateUnidadeModal"
+import { getApiErrorMessage } from "../utils/apiError"
 
 export default function Unidades() {
   const [data, setData] = useState<any[]>([])
@@ -34,6 +36,7 @@ export default function Unidades() {
       setData(res.data || [])
     } catch (error) {
       console.log("Erro ao carregar unidades", error)
+      toast.error("Erro ao carregar unidades.")
     } finally {
       setLoading(false)
     }
@@ -45,6 +48,7 @@ export default function Unidades() {
       setMunicipalities(res.data.data || res.data || [])
     } catch (error) {
       console.log("Erro ao carregar municípios", error)
+      toast.error("Erro ao carregar municípios.")
     }
   }
 
@@ -75,7 +79,7 @@ export default function Unidades() {
     if (!selectedUnidade || saving) return
 
     if (!form.name || !form.municipalityId) {
-      alert("Informe o nome da unidade e o município.")
+      toast.warning("Informe o nome da unidade e o município.")
       return
     }
 
@@ -86,11 +90,12 @@ export default function Unidades() {
 
       setEditOpen(false)
       setSelectedUnidade(null)
+      toast.success("Unidade atualizada com sucesso.")
 
       await load()
     } catch (error) {
       console.log("Erro ao atualizar unidade", error)
-      alert("Erro ao atualizar unidade.")
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar unidade."))
     } finally {
       setSaving(false)
     }
@@ -106,11 +111,12 @@ export default function Unidades() {
 
       setDeleteOpen(false)
       setSelectedUnidade(null)
+      toast.success("Unidade excluída com sucesso.")
 
       await load()
     } catch (error) {
       console.log("Erro ao excluir unidade", error)
-      alert("Erro ao excluir unidade.")
+      toast.error(getApiErrorMessage(error, "Erro ao excluir unidade."))
     } finally {
       setDeleting(false)
     }

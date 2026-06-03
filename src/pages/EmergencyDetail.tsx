@@ -5,7 +5,9 @@ import { Link, useParams } from "react-router-dom"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import type { LatLngExpression } from "leaflet"
 import { ArrowLeft, MapPin, Phone, User, Clock } from "lucide-react"
+import { toast } from "react-toastify"
 import { api } from "../services/api"
+import { getApiErrorMessage } from "../utils/apiError"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
@@ -59,6 +61,7 @@ export default function EmergencyDetail() {
       setEmergency(response.data)
     } catch (error) {
       console.log("Erro ao carregar emergência", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar emergência."))
     } finally {
       setLoading(false)
     }
