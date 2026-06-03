@@ -578,9 +578,57 @@ export default function AgendaPolicePage() {
   )
 }, [busca, registrosRealizados])
 
+  const atendimentosAgrupados = useMemo(() => {
+    const grouped: any = {}
+
+    atendimentosFiltrados.forEach((item: any) => {
+      const key = item.agendaId || item.id
+      const registro = item.registro || {}
+      const agenda = item.agenda || registro.agenda || {}
+      const isAutor = item.tipo === "AUTOR"
+      const pessoa = isAutor
+        ? registro.nome || registro.author?.nome || agenda.author?.nome || "Autor não informado"
+        : registro.nome || agenda.woman?.name || "Assistida não informada"
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          id: key,
+          agendaId: item.agendaId,
+          agenda,
+          pessoa,
+          isAutor,
+          data: agenda.date || item.data,
+          updatedAt: item.data,
+          forms: []
+        }
+      }
+
+      grouped[key].forms.push(item)
+
+      const itemTime = new Date(item.data || 0).getTime()
+      const groupTime = new Date(grouped[key].updatedAt || 0).getTime()
+
+      if (itemTime > groupTime) {
+        grouped[key].updatedAt = item.data
+      }
+    })
+
+    return Object.values(grouped)
+      .map((group: any) => ({
+        ...group,
+        forms: group.forms.sort((a: any, b: any) => {
+          const order: any = { ACOLHIMENTO: 1, ACOMPANHAMENTO: 2, AUTOR: 3 }
+          return (order[a.tipo] || 99) - (order[b.tipo] || 99)
+        })
+      }))
+      .sort((a: any, b: any) =>
+        new Date(b.updatedAt || b.data || 0).getTime() - new Date(a.updatedAt || a.data || 0).getTime()
+      )
+  }, [atendimentosFiltrados])
+
 
   const totalPaginasVisitas = Math.ceil(visitasFiltradas.length / itensPorPagina) || 1
-  const totalPaginasAtendimentos = Math.ceil(atendimentosFiltrados.length / itensPorPagina) || 1
+  const totalPaginasAtendimentos = Math.ceil(atendimentosAgrupados.length / itensPorPagina) || 1
   const totalPaginasHistorico = Math.ceil(historicoMulheres.length / itensPorPagina) || 1
 
   const visitasPaginadas = visitasFiltradas.slice(
@@ -588,7 +636,7 @@ export default function AgendaPolicePage() {
     paginaVisitas * itensPorPagina
   )
 
-  const atendimentosPaginados = atendimentosFiltrados.slice(
+  const atendimentosPaginados = atendimentosAgrupados.slice(
     (paginaAtendimentos - 1) * itensPorPagina,
     paginaAtendimentos * itensPorPagina
   )
@@ -2064,79 +2112,87 @@ export default function AgendaPolicePage() {
       <div style={styles.container}>
         <h2>Atendimentos Realizados</h2>
 
-        {atendimentosFiltrados.length === 0 ? (
+        {atendimentosAgrupados.length === 0 ? (
           <p style={{ textAlign: "center", color: "#888" }}>
             Nenhum atendimento realizado
           </p>
         ) : (
-          atendimentosPaginados.map((item: any) => {
-            const registro = item.registro
-            const isAutor = item.tipo === "AUTOR"
+          atendimentosPaginados.map((grupo: any) => {
+            const agenda = grupo.agenda || {}
 
             return (
-              <div key={item.id} style={styles.card}>
-                <strong>
-                  {isAutor
-                    ? registro.nome || registro.author?.nome || item.agenda?.author?.nome || "Autor não informado"
-                    : registro.nome || item.agenda?.woman?.name || "-"}
-                </strong>
+              <div key={grupo.id} style={styles.card}>
+                <strong>{grupo.pessoa}</strong>
 
-                <div style={styles.statusArea}>
-                  <span style={isAutor ? styles.statusNeutral : styles.statusOk}>
-                    {isAutor
-                      ? "Orientação ao autor"
-                      : item.tipo === "ACOMPANHAMENTO"
-                        ? "Acompanhamento"
-                        : "Acolhimento"}
-                  </span>
-                </div>
-
-                <p>Agenda: {item.agendaId || "-"}</p>
-
+                <p>Agenda: {grupo.agendaId || "-"}</p>
+                <p>Data da agenda: {grupo.data ? new Date(grupo.data).toLocaleString("pt-BR") : "-"}</p>
                 <p>
-                  Militares Envolvidos:{" "}
-                  {item.agenda?.militares
+                  Militares escalados:{" "}
+                  {agenda?.militares
                     ?.map((m: any) => `${m.police?.graduacao?.name} ${m.police?.user?.name}`)
                     .filter(Boolean)
                     .join(", ") || "-"}
                 </p>
 
-                <p>Data e Hora: {item.data ? new Date(item.data).toLocaleString("pt-BR") : "-"}</p>
+                <div style={styles.formGroupList}>
+                  {grupo.forms.map((item: any) => {
+                    const registro = item.registro
+                    const isAutor = item.tipo === "AUTOR"
 
-                <p>
-                  Militar que Preencheu:{" "}
-                  {registro.police?.graduacao?.name || ""} {registro.police?.user?.name || ""}
-                </p>
+                    return (
+                      <div key={item.id} style={styles.formGroupItem}>
+                        <div style={styles.formGroupHeader}>
+                          <span style={isAutor ? styles.statusNeutral : styles.statusOk}>
+                            {isAutor
+                              ? "Orientação ao autor"
+                              : item.tipo === "ACOMPANHAMENTO"
+                                ? "Acompanhamento"
+                                : "Acolhimento"}
+                          </span>
 
-                {!isAutor && registro.tipoViolencia?.length > 0 && (
-                  <p>Tipo de Violência: {registro.tipoViolencia.join(", ")}</p>
-                )}
+                          <span style={styles.formGroupDate}>
+                            {item.data ? new Date(item.data).toLocaleString("pt-BR") : "-"}
+                          </span>
+                        </div>
 
-                {isAutor && (
-                  <p>
-                    Medida protetiva: {registro.cienteMedidaProtetiva || "-"} •
-                    Antecedentes: {registro.antecedentesCriminais || "-"}
-                  </p>
-                )}
+                        <p>
+                          Militar que preencheu:{" "}
+                          {registro.police?.graduacao?.name || ""} {registro.police?.user?.name || ""}
+                        </p>
 
-                <div style={styles.pdfActions}>
-                  {item.tipo === "ACOLHIMENTO" && (
-                    <button style={styles.btnPdf} onClick={() => gerarRelatorioAtendimento(registro)}>
-                      PDF Acolhimento
-                    </button>
-                  )}
+                        {!isAutor && registro.tipoViolencia?.length > 0 && (
+                          <p>Tipo de violência: {registro.tipoViolencia.join(", ")}</p>
+                        )}
 
-                  {item.tipo === "ACOMPANHAMENTO" && (
-                    <button style={styles.btnPdf} onClick={() => gerarRelatorioAcompanhamento(registro)}>
-                      PDF Acompanhamento
-                    </button>
-                  )}
+                        {isAutor && (
+                          <p>
+                            Medida protetiva: {registro.cienteMedidaProtetiva || "-"} •
+                            Antecedentes: {registro.antecedentesCriminais || "-"}
+                          </p>
+                        )}
 
-                  {item.tipo === "AUTOR" && (
-                    <button style={styles.btnPdf} onClick={() => gerarRelatorioAutor(registro)}>
-                      PDF Orientação ao Autor
-                    </button>
-                  )}
+                        <div style={styles.pdfActions}>
+                          {item.tipo === "ACOLHIMENTO" && (
+                            <button style={styles.btnPdf} onClick={() => gerarRelatorioAtendimento(registro)}>
+                              PDF Acolhimento
+                            </button>
+                          )}
+
+                          {item.tipo === "ACOMPANHAMENTO" && (
+                            <button style={styles.btnPdf} onClick={() => gerarRelatorioAcompanhamento(registro)}>
+                              PDF Acompanhamento
+                            </button>
+                          )}
+
+                          {item.tipo === "AUTOR" && (
+                            <button style={styles.btnPdf} onClick={() => gerarRelatorioAutor(registro)}>
+                              PDF Orientação ao Autor
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -2449,6 +2505,35 @@ const styles: any = {
     display: "flex",
     gap: 8,
     flexWrap: "wrap"
+  },
+
+  formGroupList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    marginTop: 12
+  },
+
+  formGroupItem: {
+    border: "1px solid #e5e7eb",
+    borderRadius: 8,
+    padding: 12,
+    background: "#fafafa"
+  },
+
+  formGroupHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 8
+  },
+
+  formGroupDate: {
+    color: "#6b7280",
+    fontSize: "12px",
+    fontWeight: 700
   },
 
   card: {
