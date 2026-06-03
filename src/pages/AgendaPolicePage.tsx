@@ -20,6 +20,7 @@ export default function AgendaPolicePage() {
   const [atendidos, setAtendidos] = useState<any[]>([])
   const [acompanhamentos, setAcompanhamentos] = useState<any[]>([])
   const [orientacoesAutor, setOrientacoesAutor] = useState<any[]>([])
+  const [agendasNaoEncontradas, setAgendasNaoEncontradas] = useState<any[]>([])
 
   const [loading, setLoading] = useState(true)
 
@@ -35,9 +36,12 @@ export default function AgendaPolicePage() {
   const [modal, setModal] = useState(false)
   const [modalAcompanhamento, setModalAcompanhamento] = useState(false)
   const [modalAutor, setModalAutor] = useState(false)
+  const [modalNaoEncontrado, setModalNaoEncontrado] = useState(false)
+  const [motivoNaoEncontrado, setMotivoNaoEncontrado] = useState("")
   const [salvandoAtendimento, setSalvandoAtendimento] = useState(false)
   const [salvandoAcompanhamento, setSalvandoAcompanhamento] = useState(false)
   const [salvandoAutor, setSalvandoAutor] = useState(false)
+  const [salvandoNaoEncontrado, setSalvandoNaoEncontrado] = useState(false)
 
 
   const [form, setForm] = useState<any>({
@@ -67,7 +71,8 @@ export default function AgendaPolicePage() {
         load(),
         loadAtendimentos(),
         loadAcompanhamentos(),
-        loadOrientacoesAutor()
+        loadOrientacoesAutor(),
+        loadAgendasNaoEncontradas()
       ])
     } finally {
       setLoading(false)
@@ -219,6 +224,17 @@ export default function AgendaPolicePage() {
     } catch (error) {
       console.log("Orientações do autor ainda não disponíveis", error)
       setOrientacoesAutor([])
+    }
+  }
+
+  async function loadAgendasNaoEncontradas() {
+    try {
+      const response = await api.get("/agenda/not-found")
+      setAgendasNaoEncontradas(normalizeList(response.data))
+    } catch (error) {
+      console.log("Erro ao carregar agendas não encontradas", error)
+      toast.error(getApiErrorMessage(error, "Erro ao carregar agendas encerradas."))
+      setAgendasNaoEncontradas([])
     }
   }
 
@@ -491,11 +507,19 @@ export default function AgendaPolicePage() {
       agendaId: item.agendaId,
       agenda: item.agenda,
       registro: item
+    })),
+    ...agendasNaoEncontradas.map((item: any) => ({
+      id: `nao-encontrado-${item.id}`,
+      tipo: "NAO_ENCONTRADO",
+      data: item.notFoundAt || item.createdAt,
+      agendaId: item.id,
+      agenda: item,
+      registro: item
     }))
   ].sort((a: any, b: any) =>
     new Date(b.data || 0).getTime() - new Date(a.data || 0).getTime()
   )
-}, [atendimentosPermitidos, acompanhamentosPermitidos, orientacoesAutorPermitidas])
+}, [atendimentosPermitidos, acompanhamentosPermitidos, orientacoesAutorPermitidas, agendasNaoEncontradas])
 
   const historicoMulheres = useMemo(() => {
     const grouped: any = {}
@@ -570,6 +594,8 @@ export default function AgendaPolicePage() {
       item.agenda?.woman?.phone,
       item.agenda?.municipality?.name,
       item.agendaId,
+      item.registro?.notFoundReason,
+      item.tipo === "NAO_ENCONTRADO" ? "não encontrado ausente encerrada" : "",
       item.registro?.police?.user?.name,
       item.registro?.police?.graduacao?.name,
       item.registro?.tipoViolencia?.join(" "),
@@ -589,7 +615,7 @@ export default function AgendaPolicePage() {
       const key = item.agendaId || item.id
       const registro = item.registro || {}
       const agenda = item.agenda || registro.agenda || {}
-      const isAutor = item.tipo === "AUTOR"
+      const isAutor = item.tipo === "AUTOR" || (item.tipo === "NAO_ENCONTRADO" && isAgendaAutor(agenda))
       const pessoa = isAutor
         ? registro.nome || registro.author?.nome || agenda.author?.nome || "Autor não informado"
         : registro.nome || agenda.woman?.name || "Assistida não informada"
@@ -621,7 +647,7 @@ export default function AgendaPolicePage() {
       .map((group: any) => ({
         ...group,
         forms: group.forms.sort((a: any, b: any) => {
-          const order: any = { ACOLHIMENTO: 1, ACOMPANHAMENTO: 2, AUTOR: 3 }
+          const order: any = { ACOLHIMENTO: 1, ACOMPANHAMENTO: 2, AUTOR: 3, NAO_ENCONTRADO: 4 }
           return (order[a.tipo] || 99) - (order[b.tipo] || 99)
         })
       }))
@@ -765,6 +791,12 @@ export default function AgendaPolicePage() {
     setModalAutor(true)
   }
 
+  function abrirNaoEncontrado(item: any) {
+    setSelected(item)
+    setMotivoNaoEncontrado("")
+    setModalNaoEncontrado(true)
+  }
+
   function handleChange(e: any) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
@@ -861,6 +893,41 @@ export default function AgendaPolicePage() {
     setSalvandoAcompanhamento(false)
   }
 }
+
+  async function salvarNaoEncontrado() {
+    if (!selected || salvandoNaoEncontrado) return
+
+    if (!motivoNaoEncontrado.trim()) {
+      toast.warning("Descreva o motivo do não atendimento.")
+      return
+    }
+
+    try {
+      setSalvandoNaoEncontrado(true)
+
+      await api.put(`/agenda/not-found/${selected.id}`, {
+        reason: motivoNaoEncontrado.trim()
+      })
+
+      toast.success(
+        isAgendaAutor(selected)
+          ? "Autor marcado como não encontrado."
+          : "Assistida marcada como não encontrada."
+      )
+
+      setModalNaoEncontrado(false)
+      setModalEscolha(false)
+      setSelected(null)
+      setMotivoNaoEncontrado("")
+
+      await carregarDados()
+    } catch (error) {
+      console.log(error)
+      toast.error(getApiErrorMessage(error, "Erro ao encerrar agenda."))
+    } finally {
+      setSalvandoNaoEncontrado(false)
+    }
+  }
 
   async function salvarAutor() {
   if (salvandoAutor) return
@@ -1383,6 +1450,10 @@ export default function AgendaPolicePage() {
                     ? "Continuar Atendimento"
                     : "Iniciar Atendimento"}
                 </button>
+
+                <button style={styles.btnNotFound} onClick={() => abrirNaoEncontrado(item)}>
+                  {agendaAutor ? "Autor não encontrado" : "Assistida não encontrada"}
+                </button>
               </div>
             )
           })}
@@ -1510,6 +1581,47 @@ export default function AgendaPolicePage() {
               <button style={styles.btnCancel} onClick={() => setModalEscolha(false)}>
                 Cancelar
               </button>
+            </div>
+          </div>
+        )}
+
+        {modalNaoEncontrado && selected && (
+          <div style={styles.overlay}>
+            <div style={styles.modalEscolha}>
+              <h2 style={styles.title}>
+                {isAgendaAutor(selected) ? "Autor não encontrado" : "Assistida não encontrada"}
+              </h2>
+
+              <p style={styles.modalText}>
+                Descreva o ocorrido na visita. Ao salvar, a agenda será encerrada sem preenchimento de formulário.
+              </p>
+
+              <FormTextarea
+                label="Descrição"
+                value={motivoNaoEncontrado}
+                onChange={(e: any) => setMotivoNaoEncontrado(e.target.value)}
+              />
+
+              <div style={styles.actions}>
+                <button
+                  style={styles.btnCancel}
+                  onClick={() => {
+                    setModalNaoEncontrado(false)
+                    setMotivoNaoEncontrado("")
+                  }}
+                  disabled={salvandoNaoEncontrado}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  style={salvandoNaoEncontrado ? styles.btnDisabled : styles.btnNotFoundConfirm}
+                  onClick={salvarNaoEncontrado}
+                  disabled={salvandoNaoEncontrado}
+                >
+                  {salvandoNaoEncontrado ? "Salvando..." : "Salvar e encerrar agenda"}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2142,12 +2254,15 @@ export default function AgendaPolicePage() {
                   {grupo.forms.map((item: any) => {
                     const registro = item.registro
                     const isAutor = item.tipo === "AUTOR"
+                    const isNaoEncontrado = item.tipo === "NAO_ENCONTRADO"
 
                     return (
                       <div key={item.id} style={styles.formGroupItem}>
                         <div style={styles.formGroupHeader}>
-                          <span style={isAutor ? styles.statusNeutral : styles.statusOk}>
-                            {isAutor
+                          <span style={isNaoEncontrado ? styles.statusPendente : isAutor ? styles.statusNeutral : styles.statusOk}>
+                            {isNaoEncontrado
+                              ? isAgendaAutor(registro) ? "Autor não encontrado" : "Assistida não encontrada"
+                              : isAutor
                               ? "Orientação ao autor"
                               : item.tipo === "ACOMPANHAMENTO"
                                 ? "Acompanhamento"
@@ -2159,16 +2274,20 @@ export default function AgendaPolicePage() {
                           </span>
                         </div>
 
-                        <p>
-                          Militar que preencheu:{" "}
-                          {registro.police?.graduacao?.name || ""} {registro.police?.user?.name || ""}
-                        </p>
+                        {isNaoEncontrado ? (
+                          <p>Motivo: {registro.notFoundReason || "-"}</p>
+                        ) : (
+                          <p>
+                            Militar que preencheu:{" "}
+                            {registro.police?.graduacao?.name || ""} {registro.police?.user?.name || ""}
+                          </p>
+                        )}
 
-                        {!isAutor && registro.tipoViolencia?.length > 0 && (
+                        {!isAutor && !isNaoEncontrado && registro.tipoViolencia?.length > 0 && (
                           <p>Tipo de violência: {registro.tipoViolencia.join(", ")}</p>
                         )}
 
-                        {isAutor && (
+                        {isAutor && !isNaoEncontrado && (
                           <p>
                             Medida protetiva: {registro.cienteMedidaProtetiva || "-"} •
                             Antecedentes: {registro.antecedentesCriminais || "-"}
@@ -2558,6 +2677,34 @@ const styles: any = {
     borderRadius: "8px",
     border: "none",
     cursor: "pointer"
+  },
+
+  btnNotFound: {
+    marginTop: 10,
+    marginLeft: 8,
+    background: "#b91c1c",
+    color: "#fff",
+    padding: "10px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer"
+  },
+
+  btnNotFoundConfirm: {
+    flex: 1,
+    background: "#b91c1c",
+    color: "#fff",
+    padding: "12px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer"
+  },
+
+  modalText: {
+    color: "#4b5563",
+    fontSize: "14px",
+    lineHeight: 1.5,
+    marginTop: 0
   },
 
   statusArea: {
