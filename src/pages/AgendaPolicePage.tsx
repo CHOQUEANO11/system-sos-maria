@@ -287,6 +287,16 @@ export default function AgendaPolicePage() {
     )
   }
 
+  function canFillAcompanhamento(item: any) {
+    if (isAgendaAutor(item) || hasAcompanhamento(item.id)) return false
+
+    if (!isPrimeiraVisitaDaMulher(item)) {
+      return true
+    }
+
+    return hasAcolhimentoDaMulher(item)
+  }
+
   function hasOrientacaoAutor(agendaId: string) {
     return orientacoesAutor.some((item: any) => item.agendaId === agendaId)
   }
@@ -690,7 +700,7 @@ export default function AgendaPolicePage() {
   }
 
   function abrirAcompanhamento() {
-    if (!selected || hasAcompanhamento(selected.id)) return
+    if (!selected || !canFillAcompanhamento(selected)) return
 
     setModalEscolha(false)
     setModalAcompanhamento(true)
@@ -1432,11 +1442,15 @@ export default function AgendaPolicePage() {
               </button>
 
               <button
-                style={selected && hasAcompanhamento(selected.id) ? styles.btnDisabled : styles.btnPrimary}
-                disabled={selected && hasAcompanhamento(selected.id)}
+                style={selected && !canFillAcompanhamento(selected) ? styles.btnDisabled : styles.btnPrimary}
+                disabled={selected && !canFillAcompanhamento(selected)}
                 onClick={abrirAcompanhamento}
               >
-                Questionário de Acompanhamento
+                {selected && hasAcompanhamento(selected.id)
+                  ? "Acompanhamento já preenchido"
+                  : selected && isPrimeiraVisitaDaMulher(selected) && !hasAcolhimentoDaMulher(selected)
+                    ? "Faça o acolhimento primeiro"
+                    : "Questionário de Acompanhamento"}
               </button>
                 </>
               )}
