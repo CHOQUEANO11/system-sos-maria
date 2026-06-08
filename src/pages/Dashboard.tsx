@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [adminsChart, setAdminsChart] = useState<any[]>([])
   const [emergenciesByMunicipality, setEmergenciesByMunicipality] = useState<any[]>([])
   const [visitsByMunicipality, setVisitsByMunicipality] = useState<any[]>([])
+  const [monthlyVisitsByWoman, setMonthlyVisitsByWoman] = useState<any[]>([])
   const [authorsByMunicipality, setAuthorsByMunicipality] = useState<any[]>([])
   const [authorVisitsByMunicipality, setAuthorVisitsByMunicipality] = useState<any[]>([])
   const [emergencyHeatMap, setEmergencyHeatMap] = useState<any[]>([])
@@ -70,7 +71,7 @@ export default function Dashboard() {
         params.municipalityId = user?.municipalityId
       }
 
-      const [womenRes, adminsRes, emergenciesRes, appointmentsRes, authorsRes, authorVisitsRes] = await Promise.all([
+      const [womenRes, adminsRes, emergenciesRes, appointmentsRes, followupsRes, authorsRes, authorVisitsRes] = await Promise.all([
         api.get("/users", {
           params: { role: "WOMAN", ...params, all: true }
         }),
@@ -83,6 +84,8 @@ export default function Dashboard() {
 
         api.get("/appointment/atendimentos", { params }),
 
+        api.get("/appointment/acompanhamentos", { params }).catch(() => ({ data: [] })),
+
         api.get("/authors", { params: { ...params, all: true, limit: 9999 } }).catch(() => ({ data: [] })),
 
         api.get("/appointment/author-orientations", { params }).catch(() => ({ data: [] }))
@@ -94,6 +97,7 @@ export default function Dashboard() {
       const authors = normalizeList(authorsRes.data)
       const authorVisitsRaw = normalizeList(authorVisitsRes.data)
       const appointmentsRaw = appointmentsRes.data?.data || appointmentsRes.data || []
+      const followupsRaw = normalizeList(followupsRes.data)
       const appointments =
         user?.role === "SUPER_ADMIN"
           ? appointmentsRaw
@@ -103,6 +107,21 @@ export default function Dashboard() {
                 a.municipality?.id,
                 a.agenda?.municipalityId,
                 a.agenda?.municipality?.id
+              ].filter(Boolean)
+
+              if (municipalityIds.length === 0) return true
+
+              return municipalityIds.includes(user?.municipalityId)
+            })
+      const followups =
+        user?.role === "SUPER_ADMIN"
+          ? followupsRaw
+          : followupsRaw.filter((item: any) => {
+              const municipalityIds = [
+                item.municipalityId,
+                item.municipality?.id,
+                item.agenda?.municipalityId,
+                item.agenda?.municipality?.id
               ].filter(Boolean)
 
               if (municipalityIds.length === 0) return true
@@ -217,6 +236,7 @@ export default function Dashboard() {
         .sort((a, b) => b.visitas - a.visitas)
 
       setVisitsByMunicipality(municipalityVisitsData)
+      setMonthlyVisitsByWoman(buildMonthlyVisitsByWoman(appointments, followups))
 
       const municipalityAuthors: any = {}
 
@@ -294,6 +314,48 @@ export default function Dashboard() {
     return []
   }
 
+  function buildMonthlyVisitsByWoman(appointments: any[], followups: any[]) {
+    const now = new Date()
+    const uniqueVisits = new Map<string, any>()
+
+    ;[...appointments, ...followups].forEach((item: any) => {
+      const dateValue = item.agenda?.date || item.dataVisita || item.dataAtendimento || item.createdAt
+      const date = new Date(dateValue)
+
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.getMonth() !== now.getMonth() ||
+        date.getFullYear() !== now.getFullYear()
+      ) return
+
+      const woman = item.agenda?.woman || {}
+      const womanId = woman.id || item.userId || item.cpf || item.nome
+      if (!womanId) return
+
+      const visitKey = item.agendaId || `${womanId}-${date.toISOString()}`
+      uniqueVisits.set(visitKey, {
+        womanId,
+        name: woman.name || item.nome || "Assistida não informada",
+        municipality: item.agenda?.municipality?.name || item.cidade || "Sem município"
+      })
+    })
+
+    const grouped = new Map<string, any>()
+
+    uniqueVisits.forEach((visit) => {
+      const current = grouped.get(visit.womanId) || {
+        name: visit.name,
+        municipality: visit.municipality,
+        visitas: 0
+      }
+
+      current.visitas++
+      grouped.set(visit.womanId, current)
+    })
+
+    return Array.from(grouped.values()).sort((a, b) => b.visitas - a.visitas)
+  }
+
   function generateDashboardPdf() {
     const doc = new jsPDF()
 
@@ -337,6 +399,12 @@ export default function Dashboard() {
 
     addPdfTable(doc, "Visitas realizadas por município", ["Município", "Visitas"], visitsByMunicipality.map((item) => [
       item.name,
+      item.visitas
+    ]))
+
+    addPdfTable(doc, "Visitas por assistida no mês atual", ["Assistida", "Município", "Visitas"], monthlyVisitsByWoman.map((item) => [
+      item.name,
+      item.municipality,
       item.visitas
     ]))
 
@@ -708,6 +776,32 @@ export default function Dashboard() {
             valueKey="visitas"
             labelKey="name"
             color="#059669"
+          />
+        )}
+      </div>
+
+      <div style={styles.chartCard}>
+        <div style={styles.chartHeader}>
+          <div>
+            <h3 style={styles.chartTitle}>Visitas por assistida no mês</h3>
+            <p style={styles.chartSubtitle}>
+              Quantidade de visitas únicas recebidas por cada mulher no mês atual.
+            </p>
+          </div>
+
+          <div style={styles.visitsIcon}>
+            <UserRoundCheck size={20} />
+          </div>
+        </div>
+
+        {monthlyVisitsByWoman.length === 0 ? (
+          <EmptyChart text="Nenhuma visita de assistida registrada no mês atual." />
+        ) : (
+          <HorizontalBarChart
+            data={monthlyVisitsByWoman}
+            valueKey="visitas"
+            labelKey="name"
+            color="#db2777"
           />
         )}
       </div>

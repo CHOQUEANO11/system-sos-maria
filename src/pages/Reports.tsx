@@ -25,6 +25,7 @@ type ReportType =
   | "demographics"
   | "emergencies"
   | "visitsWomen"
+  | "monthlyWomenVisits"
   | "visitsAuthors"
   | "violenceTypes"
   | "police"
@@ -36,6 +37,7 @@ const reportOptions = [
   { value: "demographics", label: "Perfil das mulheres" },
   { value: "emergencies", label: "Pedidos de ajuda" },
   { value: "visitsWomen", label: "Visitas de mulheres" },
+  { value: "monthlyWomenVisits", label: "Visitas mensais por mulher" },
   { value: "visitsAuthors", label: "Visitas de autores" },
   { value: "violenceTypes", label: "Tipos de violência" },
   { value: "police", label: "Atendimentos por policial" },
@@ -150,6 +152,7 @@ export default function Reports() {
     if (activeReport === "demographics") return buildDemographicRows()
     if (activeReport === "emergencies") return buildEmergencyRows()
     if (activeReport === "visitsWomen") return buildWomenVisitRows()
+    if (activeReport === "monthlyWomenVisits") return buildMonthlyWomenVisitRows()
     if (activeReport === "visitsAuthors") return buildAuthorVisitRows()
     if (activeReport === "violenceTypes") return buildViolenceRows()
     if (activeReport === "police") return buildPoliceRows()
@@ -272,6 +275,53 @@ export default function Reports() {
     ]
 
     return rows.sort((a, b) => compareDateText(b.data, a.data))
+  }
+
+  function buildMonthlyWomenVisitRows() {
+    const uniqueVisits = new Map<string, any>()
+
+    ;[...appointments, ...followups].forEach((item: any) => {
+      if (municipalityId && getMunicipalityId(item) !== municipalityId) return
+
+      const dateValue = item.agenda?.date || item.dataVisita || item.dataAtendimento || item.createdAt
+      const date = new Date(dateValue)
+      if (Number.isNaN(date.getTime())) return
+
+      if (startDate || endDate) {
+        if (!isInsidePeriod(dateValue)) return
+      } else {
+        const now = new Date()
+        if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return
+      }
+
+      const woman = item.agenda?.woman || {}
+      const womanId = woman.id || item.userId || item.cpf || item.nome
+      if (!womanId) return
+
+      const visitKey = item.agendaId || `${womanId}-${date.toISOString()}`
+      uniqueVisits.set(visitKey, {
+        womanId,
+        assistida: woman.name || item.nome || "Assistida não informada",
+        municipio: getMunicipalityName(item),
+        monthKey: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+        mes: date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      })
+    })
+
+    const grouped = new Map<string, any>()
+
+    uniqueVisits.forEach((visit) => {
+      const key = `${visit.womanId}-${visit.monthKey}`
+      const current = grouped.get(key) || { ...visit, visitas: 0 }
+      current.visitas++
+      grouped.set(key, current)
+    })
+
+    const term = search.trim().toLowerCase()
+
+    return Array.from(grouped.values())
+      .filter((item) => !term || stringifyRow(item).includes(term))
+      .sort((a, b) => b.visitas - a.visitas || a.assistida.localeCompare(b.assistida))
   }
 
   function buildAuthorVisitRows() {
@@ -423,6 +473,7 @@ export default function Reports() {
     if (activeReport === "demographics") return ["Município", "Raça", "Cor", "Escolaridade", "Total", "Média idade"]
     if (activeReport === "emergencies") return ["Município", "Total", "Pendentes", "Em progresso", "Atendidos"]
     if (activeReport === "visitsWomen") return ["Tipo", "Assistida", "Município", "Data", "Policial", "Violência/Atendimento"]
+    if (activeReport === "monthlyWomenVisits") return ["Assistida", "Município", "Mês", "Visitas recebidas"]
     if (activeReport === "visitsAuthors") return ["Autor", "Assistida", "Município", "Data", "Policial", "MPU", "Medida protetiva"]
     if (activeReport === "violenceTypes") return ["Tipo de violência", "Total"]
     if (activeReport === "police") return ["Policial", "Total"]
@@ -435,6 +486,7 @@ export default function Reports() {
     if (activeReport === "demographics") return [row.municipio, row.race, row.color, row.education, row.total, row.mediaIdade]
     if (activeReport === "emergencies") return [row.municipio, row.total, row.pendentes, row.emProgresso, row.atendidos]
     if (activeReport === "visitsWomen") return [row.tipo, row.assistida, row.municipio, row.data, row.policial, row.violencia]
+    if (activeReport === "monthlyWomenVisits") return [row.assistida, row.municipio, row.mes, row.visitas]
     if (activeReport === "visitsAuthors") return [row.autor, row.assistida, row.municipio, row.data, row.policial, row.mpu, row.cienteMedida]
     if (activeReport === "violenceTypes") return [row.tipo, row.total]
     if (activeReport === "police") return [row.policial, row.total]
@@ -652,6 +704,27 @@ export default function Reports() {
         </button>
       </div>
 
+      {activeReport === "monthlyWomenVisits" && (
+        <div style={styles.chartCard}>
+          <div style={styles.reportHeader}>
+            <div>
+              <h3 style={styles.reportTitle}>Visitas recebidas por mulher</h3>
+              <p style={styles.reportSubtitle}>
+                {startDate || endDate
+                  ? "Visualização conforme o período selecionado."
+                  : "Visualização do mês atual."}
+              </p>
+            </div>
+          </div>
+
+          <ReportHorizontalChart
+            data={currentRows}
+            labelKey="assistida"
+            valueKey="visitas"
+          />
+        </div>
+      )}
+
       <div style={styles.reportCard}>
         <div style={styles.reportHeader}>
           <div>
@@ -781,6 +854,39 @@ function ReportCard({ icon: Icon, title, description, color, bg, onClick }: any)
         Gerar PDF
       </span>
     </button>
+  )
+}
+
+function ReportHorizontalChart({ data, labelKey, valueKey }: any) {
+  if (!data.length) {
+    return <div style={styles.empty}>Nenhuma visita encontrada para os filtros selecionados.</div>
+  }
+
+  const max = Math.max(...data.map((item: any) => Number(item[valueKey]) || 0), 1)
+
+  return (
+    <div style={styles.reportChart}>
+      {data.map((item: any, index: number) => {
+        const value = Number(item[valueKey]) || 0
+
+        return (
+          <div key={`${item[labelKey]}-${item.monthKey || index}`} style={styles.reportChartRow}>
+            <span style={styles.reportChartLabel} title={item[labelKey]}>
+              {item[labelKey]}
+            </span>
+            <div style={styles.reportChartTrack}>
+              <div
+                style={{
+                  ...styles.reportChartFill,
+                  width: `${Math.max(5, (value / max) * 100)}%`
+                }}
+              />
+            </div>
+            <strong style={styles.reportChartValue}>{value}</strong>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -931,6 +1037,58 @@ const styles: any = {
     padding: 18,
     marginBottom: 20,
     boxShadow: "0 10px 28px rgba(15,23,42,0.05)"
+  },
+
+  chartCard: {
+    background: "#fff",
+    border: "1px solid #eef2f7",
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 20,
+    boxShadow: "0 10px 28px rgba(15,23,42,0.05)"
+  },
+
+  reportChart: {
+    display: "grid",
+    gap: 10,
+    maxHeight: 440,
+    overflowY: "auto",
+    paddingRight: 4
+  },
+
+  reportChartRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(140px, 240px) minmax(180px, 1fr) 42px",
+    alignItems: "center",
+    gap: 10
+  },
+
+  reportChartLabel: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: 800
+  },
+
+  reportChartTrack: {
+    height: 16,
+    overflow: "hidden",
+    borderRadius: 4,
+    background: "#f3f4f6"
+  },
+
+  reportChartFill: {
+    height: "100%",
+    borderRadius: 4,
+    background: "#db2777"
+  },
+
+  reportChartValue: {
+    color: "#831843",
+    fontSize: 13,
+    textAlign: "right"
   },
 
   reportHeader: {
