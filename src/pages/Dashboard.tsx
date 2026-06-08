@@ -45,7 +45,8 @@ export default function Dashboard() {
     admins: 0,
     emergencies: 0,
     resolved: 0,
-    authorVisits: 0
+    authorVisits: 0,
+    monthlyWomanVisits: 0
   })
 
   const [chart, setChart] = useState<any[]>([])
@@ -159,7 +160,8 @@ export default function Dashboard() {
         admins: admins.length,
         emergencies: emergencies.length,
         resolved: resolved.length,
-        authorVisits: authorVisits.length
+        authorVisits: authorVisits.length,
+        monthlyWomanVisits: countMonthlyWomanVisits(appointments, followups)
       })
 
       const months: any = {}
@@ -388,6 +390,26 @@ export default function Dashboard() {
     return Array.from(grouped.values()).sort((a, b) => b.visitas - a.visitas)
   }
 
+  function countMonthlyWomanVisits(appointments: any[], followups: any[]) {
+    const now = new Date()
+    const uniqueVisits = new Set<string>()
+
+    ;[...appointments, ...followups].forEach((item: any) => {
+      const dateValue = item.agenda?.date || item.dataVisita || item.dataAtendimento || item.createdAt
+      const date = new Date(dateValue)
+
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.getMonth() !== now.getMonth() ||
+        date.getFullYear() !== now.getFullYear()
+      ) return
+
+      uniqueVisits.add(item.agendaId || `${item.userId || item.cpf || item.nome}-${date.toISOString()}`)
+    })
+
+    return uniqueVisits.size
+  }
+
   function generateDashboardPdf() {
     const doc = new jsPDF()
 
@@ -409,7 +431,8 @@ export default function Dashboard() {
         ["Admins", stats.admins],
         ["Pedidos de ajuda", stats.emergencies],
         ["Chamados atendidos", stats.resolved],
-        ["Visitas de autores", stats.authorVisits]
+        ["Visitas de autores", stats.authorVisits],
+        ["Total de visitas de assistidas no mês", stats.monthlyWomanVisits]
       ],
       ...pdfTableTheme()
     })
@@ -599,6 +622,14 @@ export default function Dashboard() {
           icon={ClipboardList}
           color="#7c3aed"
           bg="#f5f3ff"
+        />
+
+        <Card
+          title="Visitas de assistidas no mês"
+          value={stats.monthlyWomanVisits}
+          icon={UserRoundCheck}
+          color="#db2777"
+          bg="#fdf2f8"
         />
       </div>
 
@@ -817,7 +848,7 @@ export default function Dashboard() {
           <div>
             <h3 style={styles.chartTitle}>Visitas por assistida no mês</h3>
             <p style={styles.chartSubtitle}>
-              Quantidade de visitas únicas recebidas por cada mulher no mês atual.
+              Quantidade de visitas únicas recebidas por cada mulher no mês atual. Total: {stats.monthlyWomanVisits}.
             </p>
           </div>
 

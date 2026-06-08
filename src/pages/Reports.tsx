@@ -165,6 +165,11 @@ export default function Reports() {
     ? currentRows.slice((monthlyVisitsPage - 1) * 5, monthlyVisitsPage * 5)
     : currentRows
 
+  const monthlyVisitsTotal = useMemo(
+    () => buildMonthlyWomenVisitRows().reduce((total, item) => total + Number(item.visitas || 0), 0),
+    [appointments, followups, municipalityId, startDate, endDate, search]
+  )
+
   useEffect(() => {
     setMonthlyVisitsPage(1)
   }, [activeReport, municipalityId, startDate, endDate, search])
@@ -188,9 +193,10 @@ export default function Reports() {
       { label: "Autores", value: filteredAuthors.length, color: "#c2410c", bg: "#fff7ed", icon: UserRoundCheck },
       { label: "Pedidos de ajuda", value: filteredEmergencies.length, color: "#dc2626", bg: "#fef2f2", icon: Siren },
       { label: "Visitas de mulheres", value: filteredAppointments.length + filteredFollowups.length, color: "#4f46e5", bg: "#eef2ff", icon: ClipboardList },
+      { label: startDate || endDate ? "Visitas no período" : "Visitas no mês", value: monthlyVisitsTotal, color: "#db2777", bg: "#fdf2f8", icon: UserRoundCheck },
       { label: "Visitas de autores", value: filteredAuthorVisits.length, color: "#c2410c", bg: "#fff7ed", icon: ShieldCheck }
     ]
-  }, [women, authors, emergencies, appointments, followups, authorVisits, municipalityId, startDate, endDate])
+  }, [women, authors, emergencies, appointments, followups, authorVisits, municipalityId, startDate, endDate, search, monthlyVisitsTotal])
 
   function filterBase(items: any[], dateField: string) {
     return items.filter((item) => {
@@ -547,9 +553,15 @@ export default function Reports() {
     const label = reportOptions.find((item) => item.value === activeReport)?.label || "Relatório"
 
     header(doc, label)
+
+    if (activeReport === "monthlyWomenVisits") {
+      doc.setFontSize(10)
+      doc.text(`Total de visitas: ${monthlyVisitsTotal}`, 14, 39)
+    }
+
     autoTable(doc, {
       ...tableTheme(),
-      startY: 42,
+      startY: activeReport === "monthlyWomenVisits" ? 46 : 42,
       head: [getColumns()],
       body: currentRows.map(getRowValues)
     })
@@ -728,7 +740,7 @@ export default function Reports() {
               <p style={styles.reportSubtitle}>
                 {startDate || endDate
                   ? "Visualização conforme o período selecionado."
-                  : "Visualização do mês atual."}
+                  : "Visualização do mês atual."} Total: {monthlyVisitsTotal} visita(s).
               </p>
             </div>
           </div>
