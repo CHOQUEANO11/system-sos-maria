@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useMemo, useState } from "react"
-import { ClipboardList, Search } from "lucide-react"
+import { CheckCircle, ClipboardList, Search } from "lucide-react"
 import { toast } from "react-toastify"
 import { api } from "../services/api"
 import { useAuth } from "../context/AuthContext"
@@ -14,6 +14,7 @@ export default function VisitRequests() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  const [receivingId, setReceivingId] = useState<string | null>(null)
 
   const limit = 10
 
@@ -43,10 +44,11 @@ export default function VisitRequests() {
 
   const filteredRequests = useMemo(() => {
     const term = search.toLowerCase().trim()
+    const pendingRequests = requests.filter((request: any) => request.status === "PENDENTE")
 
-    if (!term) return requests
+    if (!term) return pendingRequests
 
-    return requests.filter((r: any) =>
+    return pendingRequests.filter((r: any) =>
       [
         r.user?.name,
         r.municipality?.name,
@@ -60,6 +62,33 @@ export default function VisitRequests() {
         .includes(term)
     )
   }, [requests, search])
+
+  async function markAsReceived(request: any) {
+    if (receivingId) return
+
+    try {
+      setReceivingId(request.id)
+
+      await api.put(`/visit-requests/${request.id}`, {
+        status: "RECEBIDO"
+      })
+
+      setRequests((current) => current.filter((item) => item.id !== request.id))
+      toast.success("Pedido marcado como recebido. A assistida será notificada.")
+
+      const remainingItems = filteredRequests.length - 1
+      const remainingPages = Math.ceil(remainingItems / limit) || 1
+
+      if (page > remainingPages) {
+        setPage(remainingPages)
+      }
+    } catch (error) {
+      console.log("Erro ao marcar solicitação como recebida", error)
+      toast.error(getApiErrorMessage(error, "Erro ao marcar pedido como recebido."))
+    } finally {
+      setReceivingId(null)
+    }
+  }
 
   const totalPages = Math.ceil(filteredRequests.length / limit) || 1
 
@@ -129,13 +158,14 @@ export default function VisitRequests() {
                 <th style={styles.th}>Motivo</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Data</th>
+                <th style={styles.th}>Ação</th>
               </tr>
             </thead>
 
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} style={styles.empty}>
+                  <td colSpan={6} style={styles.empty}>
                     Carregando solicitações...
                   </td>
                 </tr>
@@ -143,7 +173,7 @@ export default function VisitRequests() {
 
               {!loading && filteredRequests.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={styles.empty}>
+                  <td colSpan={6} style={styles.empty}>
                     Nenhuma solicitação encontrada
                   </td>
                 </tr>
@@ -182,6 +212,18 @@ export default function VisitRequests() {
                       {r.createdAt
                         ? new Date(r.createdAt).toLocaleDateString("pt-BR")
                         : "-"}
+                    </td>
+
+                    <td style={styles.td}>
+                      <button
+                        type="button"
+                        style={receivingId === r.id ? styles.receiveBtnDisabled : styles.receiveBtn}
+                        disabled={receivingId === r.id}
+                        onClick={() => markAsReceived(r)}
+                      >
+                        <CheckCircle size={15} />
+                        {receivingId === r.id ? "Salvando..." : "Marcar como recebido"}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -338,6 +380,36 @@ const styles: any = {
 
   row: {
     transition: "background 0.2s"
+  },
+
+  receiveBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "9px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#059669",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 800,
+    whiteSpace: "nowrap"
+  },
+
+  receiveBtnDisabled: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "9px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#d1d5db",
+    color: "#6b7280",
+    cursor: "not-allowed",
+    fontSize: 12,
+    fontWeight: 800,
+    whiteSpace: "nowrap"
   },
 
   name: {

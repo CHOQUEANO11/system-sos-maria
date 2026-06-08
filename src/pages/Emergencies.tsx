@@ -3,7 +3,7 @@
 
 import { Link } from "react-router-dom"
 import { Fragment, useEffect, useRef, useState } from "react"
-import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Clock, Eye, MapPin } from "lucide-react"
+import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Clock, Eye, MapPin, Trash2 } from "lucide-react"
 import { io, type Socket } from "socket.io-client"
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet"
 import type { LatLngExpression } from "leaflet"
@@ -45,6 +45,7 @@ export default function Emergencies() {
   const [now, setNow] = useState(Date.now())
   const [openMapId, setOpenMapId] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const alertedRef = useRef<Set<string>>(new Set())
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -242,6 +243,87 @@ export default function Emergencies() {
     }
   }
 
+  function canDeleteEmergency() {
+    return user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
+  }
+
+  function confirmDeleteEmergency(item: Emergency) {
+    if (!canDeleteEmergency() || deletingId) return
+
+    const toastId = `delete-emergency-${item.id}`
+
+    toast.warning(
+      ({ closeToast }) => (
+        <div>
+          <strong>Excluir pedido de ajuda?</strong>
+          <p style={styles.confirmToastText}>
+            O pedido de {item.user?.name || "assistida não informada"} será excluído permanentemente.
+          </p>
+
+          <div style={styles.confirmToastActions}>
+            <button
+              type="button"
+              style={styles.confirmCancelBtn}
+              onClick={closeToast}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              style={styles.confirmDeleteBtn}
+              onClick={() => {
+                closeToast?.()
+                deleteEmergency(item)
+              }}
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        toastId,
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false
+      }
+    )
+  }
+
+  async function deleteEmergency(item: Emergency) {
+    if (!canDeleteEmergency() || deletingId) return
+
+    try {
+      setDeletingId(item.id)
+
+      await api.delete(`/emergencies/${item.id}`)
+
+      alertedRef.current.delete(item.id)
+      setOpenMapId((current) => current === item.id ? null : current)
+
+      const remaining = emergencies.filter((current) => current.id !== item.id)
+      setEmergencies(remaining)
+
+      if (!remaining.some((current) => current.status === "PENDING")) {
+        stopEmergencyAlert()
+      }
+
+      toast.success("Pedido de ajuda excluído com sucesso.")
+
+      if (remaining.length === 0 && page > 1) {
+        setPage((current) => Math.max(current - 1, 1))
+      } else {
+        await loadEmergencies()
+      }
+    } catch (error) {
+      console.log("Erro ao excluir pedido de ajuda", error)
+      toast.error("Erro ao excluir pedido de ajuda.")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   function getElapsed(createdAt: string) {
     const start = new Date(createdAt).getTime()
     const diff = now - start
@@ -431,6 +513,19 @@ export default function Emergencies() {
                                 {updatingId === item.id ? "Salvando..." : "Atendido"}
                               </button>
                             )}
+
+                            {canDeleteEmergency() && (
+                              <button
+                                type="button"
+                                title="Excluir pedido de ajuda"
+                                style={deletingId === item.id ? styles.deleteBtnDisabled : styles.deleteBtn}
+                                disabled={deletingId === item.id}
+                                onClick={() => confirmDeleteEmergency(item)}
+                              >
+                                <Trash2 size={14} />
+                                {deletingId === item.id ? "Excluindo..." : "Excluir"}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -538,6 +633,12 @@ const styles: any = {
   mapToggleBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#fdf2f8", color: "#be185d", border: "1px solid #fbcfe8", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" },
   mapToggleDisabled: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#f3f4f6", color: "#9ca3af", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "not-allowed" },
   resolveBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#059669", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" },
+  deleteBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#b91c1c", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" },
+  deleteBtnDisabled: { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "#e5e7eb", color: "#9ca3af", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "not-allowed" },
+  confirmToastText: { margin: "8px 0 12px", color: "#4b5563", fontSize: 13, lineHeight: 1.4 },
+  confirmToastActions: { display: "flex", justifyContent: "flex-end", gap: 8 },
+  confirmCancelBtn: { padding: "7px 11px", background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700 },
+  confirmDeleteBtn: { padding: "7px 11px", background: "#b91c1c", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700 },
   mapAccordionCell: { padding: 16, background: "#f8fafc", borderBottom: "1px solid #e5e7eb" },
   mapAccordionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" },
   mapTitle: { color: "#111827", fontSize: 14 },

@@ -29,6 +29,7 @@ export default function AgendaPolicePage() {
   const [paginaVisitas, setPaginaVisitas] = useState(1)
   const [paginaAtendimentos, setPaginaAtendimentos] = useState(1)
   const [paginaHistorico, setPaginaHistorico] = useState(1)
+  const [paginasFormulariosHistorico, setPaginasFormulariosHistorico] = useState<Record<string, number>>({})
 
   const itensPorPagina = 5
 
@@ -127,6 +128,15 @@ export default function AgendaPolicePage() {
     if (Array.isArray(response)) return response
     if (Array.isArray(response?.data)) return response.data
     return []
+  }
+
+  function getDateTimestamp(value: any) {
+    const timestamp = value ? new Date(value).getTime() : 0
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  function compareDatesDesc(a: any, b: any) {
+    return getDateTimestamp(b) - getDateTimestamp(a)
   }
 
   function hasPoliceAssignmentData(agenda: any) {
@@ -516,9 +526,7 @@ export default function AgendaPolicePage() {
       agenda: item,
       registro: item
     }))
-  ].sort((a: any, b: any) =>
-    new Date(b.data || 0).getTime() - new Date(a.data || 0).getTime()
-  )
+  ].sort((a: any, b: any) => compareDatesDesc(a.agenda?.date || a.data, b.agenda?.date || b.data))
 }, [atendimentosPermitidos, acompanhamentosPermitidos, orientacoesAutorPermitidas, agendasNaoEncontradas])
 
   const historicoMulheres = useMemo(() => {
@@ -554,10 +562,15 @@ export default function AgendaPolicePage() {
     const term = buscaHistoricoMulher.toLowerCase().trim()
 
     return Object.values(grouped)
-      .map((item: any) => ({
-        ...item,
-        forms: item.forms.sort((a: any, b: any) => new Date(b.data || 0).getTime() - new Date(a.data || 0).getTime())
-      }))
+      .map((item: any) => {
+        const forms = item.forms.sort((a: any, b: any) => compareDatesDesc(a.data, b.data))
+
+        return {
+          ...item,
+          forms,
+          latestDate: forms[0]?.data
+        }
+      })
       .filter((item: any) => {
         if (!term) return true
 
@@ -573,7 +586,10 @@ export default function AgendaPolicePage() {
           .toLowerCase()
           .includes(term)
       })
-      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+      .sort((a: any, b: any) =>
+        compareDatesDesc(a.latestDate, b.latestDate) ||
+        a.name.localeCompare(b.name)
+      )
   }, [atendimentosPermitidos, acompanhamentosPermitidos, buscaHistoricoMulher])
 
   const atendimentosFiltrados = useMemo(() => {
@@ -652,7 +668,7 @@ export default function AgendaPolicePage() {
         })
       }))
       .sort((a: any, b: any) =>
-        new Date(b.updatedAt || b.data || 0).getTime() - new Date(a.updatedAt || a.data || 0).getTime()
+        compareDatesDesc(a.data || a.updatedAt, b.data || b.updatedAt)
       )
   }, [atendimentosFiltrados])
 
@@ -675,6 +691,13 @@ export default function AgendaPolicePage() {
     (paginaHistorico - 1) * itensPorPagina,
     paginaHistorico * itensPorPagina
   )
+
+  function setPaginaFormulariosHistorico(womanId: string, pagina: number, totalPaginas: number) {
+    setPaginasFormulariosHistorico((prev) => ({
+      ...prev,
+      [womanId]: Math.min(Math.max(pagina, 1), totalPaginas)
+    }))
+  }
 
   function open(item: any) {
     setSelected(item)
@@ -1482,6 +1505,7 @@ export default function AgendaPolicePage() {
             onChange={(e) => {
               setBuscaHistoricoMulher(e.target.value)
               setPaginaHistorico(1)
+              setPaginasFormulariosHistorico({})
             }}
           />
 
@@ -1491,17 +1515,31 @@ export default function AgendaPolicePage() {
             </p>
           ) : (
             <div style={styles.historyGrid}>
-              {historicoPaginado.map((mulher: any) => (
+              {historicoPaginado.map((mulher: any) => {
+                const totalPaginasFormularios = Math.ceil(mulher.forms.length / itensPorPagina) || 1
+                const paginaFormularios = Math.min(
+                  paginasFormulariosHistorico[mulher.id] || 1,
+                  totalPaginasFormularios
+                )
+                const formulariosPaginados = mulher.forms.slice(
+                  (paginaFormularios - 1) * itensPorPagina,
+                  paginaFormularios * itensPorPagina
+                )
+
+                return (
                 <div key={mulher.id} style={styles.historyCard}>
                   <div>
                     <strong style={styles.historyWomanName}>{mulher.name}</strong>
                     <p style={styles.historyMeta}>
                       CPF: {mulher.cpf} • Telefone: {mulher.phone} • Município: {mulher.municipality}
                     </p>
+                    <p style={styles.historyMeta}>
+                      Total de atendimentos: {mulher.forms.length}
+                    </p>
                   </div>
 
                   <div style={styles.historyForms}>
-                    {mulher.forms.map((formulario: any) => (
+                    {formulariosPaginados.map((formulario: any) => (
                       <div key={formulario.id} style={styles.historyFormRow}>
                         <div>
                           <span style={formulario.tipo === "ACOLHIMENTO" ? styles.statusOk : styles.statusNeutral}>
@@ -1525,8 +1563,45 @@ export default function AgendaPolicePage() {
                       </div>
                     ))}
                   </div>
+
+                  {totalPaginasFormularios > 1 && (
+                    <div style={styles.historyPagination}>
+                      <button
+                        style={paginaFormularios === 1 ? styles.pageButtonDisabled : styles.pageButton}
+                        disabled={paginaFormularios === 1}
+                        onClick={() =>
+                          setPaginaFormulariosHistorico(
+                            mulher.id,
+                            paginaFormularios - 1,
+                            totalPaginasFormularios
+                          )
+                        }
+                      >
+                        Anterior
+                      </button>
+
+                      <span style={styles.pageInfo}>
+                        Atendimentos: página {paginaFormularios} de {totalPaginasFormularios}
+                      </span>
+
+                      <button
+                        style={paginaFormularios === totalPaginasFormularios ? styles.pageButtonDisabled : styles.pageButton}
+                        disabled={paginaFormularios === totalPaginasFormularios}
+                        onClick={() =>
+                          setPaginaFormulariosHistorico(
+                            mulher.id,
+                            paginaFormularios + 1,
+                            totalPaginasFormularios
+                          )
+                        }
+                      >
+                        Próxima
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -2811,6 +2886,15 @@ const styles: any = {
     borderRadius: 10,
     padding: 10,
     background: "#fff",
+    flexWrap: "wrap"
+  },
+
+  historyPagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "10px",
+    marginTop: "12px",
     flexWrap: "wrap"
   },
 
