@@ -53,6 +53,7 @@ export default function Reports() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [search, setSearch] = useState("")
+  const [monthlyVisitsPage, setMonthlyVisitsPage] = useState(1)
 
   const [women, setWomen] = useState<any[]>([])
   const [authors, setAuthors] = useState<any[]>([])
@@ -158,6 +159,21 @@ export default function Reports() {
     if (activeReport === "police") return buildPoliceRows()
     return buildMunicipalityRows()
   }, [activeReport, women, authors, emergencies, appointments, followups, authorVisits, municipalities, municipalityId, startDate, endDate, search])
+
+  const monthlyVisitsTotalPages = Math.ceil(currentRows.length / 5) || 1
+  const visibleRows = activeReport === "monthlyWomenVisits"
+    ? currentRows.slice((monthlyVisitsPage - 1) * 5, monthlyVisitsPage * 5)
+    : currentRows
+
+  useEffect(() => {
+    setMonthlyVisitsPage(1)
+  }, [activeReport, municipalityId, startDate, endDate, search])
+
+  useEffect(() => {
+    if (monthlyVisitsPage > monthlyVisitsTotalPages) {
+      setMonthlyVisitsPage(monthlyVisitsTotalPages)
+    }
+  }, [monthlyVisitsPage, monthlyVisitsTotalPages])
 
   const summary = useMemo(() => {
     const filteredWomen = filterBase(women, "createdAt")
@@ -718,10 +734,18 @@ export default function Reports() {
           </div>
 
           <ReportHorizontalChart
-            data={currentRows}
+            data={visibleRows}
             labelKey="assistida"
             valueKey="visitas"
           />
+
+          {currentRows.length > 0 && (
+            <ReportPagination
+              page={monthlyVisitsPage}
+              totalPages={monthlyVisitsTotalPages}
+              onPageChange={setMonthlyVisitsPage}
+            />
+          )}
         </div>
       )}
 
@@ -755,7 +779,7 @@ export default function Reports() {
                   </td>
                 </tr>
               ) : (
-                currentRows.map((row, index) => (
+                visibleRows.map((row, index) => (
                   <tr key={index} style={styles.row}>
                     {getRowValues(row).map((value, valueIndex) => (
                       <td key={valueIndex} style={styles.td}>{value}</td>
@@ -886,6 +910,30 @@ function ReportHorizontalChart({ data, labelKey, valueKey }: any) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ReportPagination({ page, totalPages, onPageChange }: any) {
+  return (
+    <div style={styles.pagination}>
+      <button
+        style={page === 1 ? styles.pageButtonDisabled : styles.pageButton}
+        disabled={page === 1}
+        onClick={() => onPageChange(Math.max(page - 1, 1))}
+      >
+        Anterior
+      </button>
+
+      <span style={styles.pageInfo}>Página {page} de {totalPages}</span>
+
+      <button
+        style={page === totalPages ? styles.pageButtonDisabled : styles.pageButton}
+        disabled={page === totalPages}
+        onClick={() => onPageChange(Math.min(page + 1, totalPages))}
+      >
+        Próxima
+      </button>
     </div>
   )
 }
@@ -1089,6 +1137,41 @@ const styles: any = {
     color: "#831843",
     fontSize: 13,
     textAlign: "right"
+  },
+
+  pagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 16,
+    flexWrap: "wrap"
+  },
+
+  pageButton: {
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "#db2777",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 800
+  },
+
+  pageButtonDisabled: {
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "#e5e7eb",
+    color: "#9ca3af",
+    cursor: "not-allowed",
+    fontWeight: 800
+  },
+
+  pageInfo: {
+    color: "#4b5563",
+    fontSize: 13,
+    fontWeight: 800
   },
 
   reportHeader: {

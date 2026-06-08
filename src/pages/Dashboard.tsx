@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet"
 import type { LatLngExpression } from "leaflet"
 import jsPDF from "jspdf"
@@ -15,7 +15,8 @@ import {
   BarChart3,
   MapPinned,
   UserRoundCheck,
-  ClipboardList
+  ClipboardList,
+  Search
 } from "lucide-react"
 import { toast } from "react-toastify"
 
@@ -53,6 +54,8 @@ export default function Dashboard() {
   const [emergenciesByMunicipality, setEmergenciesByMunicipality] = useState<any[]>([])
   const [visitsByMunicipality, setVisitsByMunicipality] = useState<any[]>([])
   const [monthlyVisitsByWoman, setMonthlyVisitsByWoman] = useState<any[]>([])
+  const [monthlyWomanSearch, setMonthlyWomanSearch] = useState("")
+  const [monthlyWomanPage, setMonthlyWomanPage] = useState(1)
   const [authorsByMunicipality, setAuthorsByMunicipality] = useState<any[]>([])
   const [authorVisitsByMunicipality, setAuthorVisitsByMunicipality] = useState<any[]>([])
   const [emergencyHeatMap, setEmergencyHeatMap] = useState<any[]>([])
@@ -307,6 +310,35 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboard()
   }, [user])
+
+  const filteredMonthlyVisitsByWoman = useMemo(() => {
+    const term = monthlyWomanSearch.trim().toLowerCase()
+    if (!term) return monthlyVisitsByWoman
+
+    return monthlyVisitsByWoman.filter((item) =>
+      [item.name, item.municipality]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term)
+    )
+  }, [monthlyVisitsByWoman, monthlyWomanSearch])
+
+  const monthlyWomanTotalPages = Math.ceil(filteredMonthlyVisitsByWoman.length / 5) || 1
+  const paginatedMonthlyVisitsByWoman = filteredMonthlyVisitsByWoman.slice(
+    (monthlyWomanPage - 1) * 5,
+    monthlyWomanPage * 5
+  )
+
+  useEffect(() => {
+    setMonthlyWomanPage(1)
+  }, [monthlyWomanSearch])
+
+  useEffect(() => {
+    if (monthlyWomanPage > monthlyWomanTotalPages) {
+      setMonthlyWomanPage(monthlyWomanTotalPages)
+    }
+  }, [monthlyWomanPage, monthlyWomanTotalPages])
 
   function normalizeList(response: any) {
     if (Array.isArray(response)) return response
@@ -794,15 +826,33 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {monthlyVisitsByWoman.length === 0 ? (
+        <div style={styles.monthlySearchBox}>
+          <Search size={17} />
+          <input
+            style={styles.monthlySearchInput}
+            value={monthlyWomanSearch}
+            placeholder="Buscar mulher ou município"
+            onChange={(event) => setMonthlyWomanSearch(event.target.value)}
+          />
+        </div>
+
+        {filteredMonthlyVisitsByWoman.length === 0 ? (
           <EmptyChart text="Nenhuma visita de assistida registrada no mês atual." />
         ) : (
-          <HorizontalBarChart
-            data={monthlyVisitsByWoman}
-            valueKey="visitas"
-            labelKey="name"
-            color="#db2777"
-          />
+          <>
+            <HorizontalBarChart
+              data={paginatedMonthlyVisitsByWoman}
+              valueKey="visitas"
+              labelKey="name"
+              color="#db2777"
+            />
+
+            <ChartPagination
+              page={monthlyWomanPage}
+              totalPages={monthlyWomanTotalPages}
+              onPageChange={setMonthlyWomanPage}
+            />
+          </>
         )}
       </div>
 
@@ -910,6 +960,28 @@ function HorizontalBarChart({ data, valueKey, labelKey, color }: any) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ChartPagination({ page, totalPages, onPageChange }: any) {
+  return (
+    <div style={styles.chartPagination}>
+      <button
+        style={page === 1 ? styles.chartPageButtonDisabled : styles.chartPageButton}
+        disabled={page === 1}
+        onClick={() => onPageChange(Math.max(page - 1, 1))}
+      >
+        Anterior
+      </button>
+      <span style={styles.chartPageInfo}>Página {page} de {totalPages}</span>
+      <button
+        style={page === totalPages ? styles.chartPageButtonDisabled : styles.chartPageButton}
+        disabled={page === totalPages}
+        onClick={() => onPageChange(Math.min(page + 1, totalPages))}
+      >
+        Próxima
+      </button>
     </div>
   )
 }
@@ -1126,6 +1198,65 @@ const styles: any = {
     margin: "4px 0 0",
     color: "#6b7280",
     fontSize: 13
+  },
+
+  monthlySearchBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    maxWidth: 420,
+    marginBottom: 16,
+    padding: "0 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    background: "#f9fafb",
+    color: "#6b7280"
+  },
+
+  monthlySearchInput: {
+    width: "100%",
+    padding: "11px 0",
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    color: "#111827",
+    fontSize: 14
+  },
+
+  chartPagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 16,
+    flexWrap: "wrap"
+  },
+
+  chartPageButton: {
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "#db2777",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 800
+  },
+
+  chartPageButtonDisabled: {
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "#e5e7eb",
+    color: "#9ca3af",
+    cursor: "not-allowed",
+    fontWeight: 800
+  },
+
+  chartPageInfo: {
+    color: "#4b5563",
+    fontSize: 13,
+    fontWeight: 800
   },
 
   chartIcon: {
